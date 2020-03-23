@@ -6,7 +6,6 @@ import indexRouter from "./routes/index";
 import usersRouter from "./routes/users";
 import session from "express-session";
 import dotenv from "dotenv";
-import connect from "./db";
 dotenv.config();
 const app = express();
 app.use(
