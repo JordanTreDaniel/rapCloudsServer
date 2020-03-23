@@ -54,7 +54,7 @@ async function getAccessToken(req, res, next) {
   }).then(response => {
     console.log("Access Token");
     req.session.accessToken = response.data.access_token;
-    res.redirect("/search?q=tupac");
+    res.redirect("/me");
     console.log("after the access token");
   });
 }
@@ -101,9 +101,33 @@ const views = (req, res, next) => {
   }
 };
 
+const getMe = async (req, res, next) => {
+  const { accessToken } = req.session;
+  if (!accessToken) {
+    res.write(`<a href="/authorize">Sign in first</a>`);
+  }
+  axios({
+    method: "get",
+    url: `https://api.genius.com/account`,
+    headers: {
+      accept: "application/json",
+      // host: "api.genius.com",
+      authorization: `Bearer ${accessToken}`
+    }
+  })
+    .then(response => {
+      const { data } = response;
+      res.send(data);
+    })
+    .catch(err => {
+      console.log("ACCOUNT CALL FAILED!!!", err);
+      res.redirect("/authorize");
+    });
+};
 /* GET home page. */
 router.get("/authorize", authorize);
 router.get("/getAccessToken", getAccessToken);
 router.get("/search", search);
 router.get("/views", views);
+router.get("/me", getMe);
 export default router;
