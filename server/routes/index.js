@@ -12,11 +12,12 @@ const credentials = {
   }
 };
 const oauth2 = require("simple-oauth2").create(credentials); //TO-D0: Get rid of this unecessary dependency
-const redirect_uri =
+const appRootUrl =
   process.env.NODE_ENV === "development"
-    ? "http://localhost:3000/getAccessToken"
-    : "noprodversionyet";
+    ? "http://localhost:3000"
+    : "https://glacial-castle-81952.herokuapp.com";
 
+const redirect_uri = `${appRootUrl}/getAccessToken`;
 async function authorize(req, res, next) {
   const authorizationUri = oauth2.authorizationCode.authorizeURL({
     client_id: process.env.CLIENT_ID,
