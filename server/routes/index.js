@@ -19,6 +19,7 @@ const appRootUrl =
 
 const redirect_uri = `${appRootUrl}/getAccessToken`;
 async function authorize(req, res, next) {
+  console.log({ redirect_uri });
   const authorizationUri = oauth2.authorizationCode.authorizeURL({
     client_id: process.env.CLIENT_ID,
     redirect_uri,
@@ -26,6 +27,7 @@ async function authorize(req, res, next) {
     response_type: "code"
     // state: '<state>'
   });
+  console.log({ authorizationUri });
   // Redirect example using Express (see http://expressjs.com/api.html#res.redirect)
   res.redirect(authorizationUri);
   console.log("******************AFTER THE REDIRECT");
