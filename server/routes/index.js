@@ -11,12 +11,16 @@ const credentials = {
     tokenPath: "/oauth/authorize"
   }
 };
-const oauth2 = require("simple-oauth2").create(credentials);
+const oauth2 = require("simple-oauth2").create(credentials); //TO-D0: Get rid of this unecessary dependency
+const redirect_uri =
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:3000/getAccessToken"
+    : "noprodversionyet";
 
 async function authorize(req, res, next) {
   const authorizationUri = oauth2.authorizationCode.authorizeURL({
     client_id: process.env.CLIENT_ID,
-    redirect_uri: "http://localhost:3000/getAccessToken",
+    redirect_uri,
     scope: "me",
     response_type: "code"
     // state: '<state>'
@@ -41,7 +45,7 @@ async function getAccessToken(req, res, next) {
       client_secret: process.env.CLIENT_SECRET,
       grant_type: "authorization_code",
       client_id: process.env.CLIENT_ID,
-      redirect_uri: "http://localhost:3000/getAccessToken",
+      redirect_uri,
       response_type: "code"
     }
   }).then(response => {
