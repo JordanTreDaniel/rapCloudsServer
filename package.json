@@ -27,7 +27,6 @@
     "dotenv": "^8.2.0",
     "express": "~4.16.1",
     "express-session": "^1.17.0",
-    "mongodb": "^3.5.5",
     "morgan": "~1.9.1",
     "nodemon": "^2.0.2",
     "npm-run-all": "^4.1.5",
