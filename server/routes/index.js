@@ -1,27 +1,33 @@
 import express from "express";
 import axios from "axios";
 const router = express.Router();
-const credentials = {
-  client: {
-    id: process.env.PROD_CLIENT_ID,
-    secret: process.env.PROD_CLIENT_SECRET
-  },
-  auth: {
-    tokenHost: "https://api.genius.com",
-    tokenPath: "/oauth/authorize"
-  }
-};
-const oauth2 = require("simple-oauth2").create(credentials); //TO-D0: Get rid of this unecessary dependency
 const appRootUrl =
   process.env.NODE_ENV === "development"
     ? "http://localhost:3333"
-    : "https://rap-clouds-server.herokuapp.com/";
+    : "https://rap-clouds-server.herokuapp.com";
 
 const redirect_uri = `${appRootUrl}/getAccessToken`;
+
 async function authorize(req, res, next) {
-  console.log({ redirect_uri });
+  const credentials = {
+    client: {
+      id: process.env.CLIENT_ID,
+      secret: process.env.CLIENT_SECRET
+    },
+
+    auth: {
+      tokenHost: "https://api.genius.com",
+      tokenPath: "/oauth/authorize"
+    }
+  };
+  const oauth2 = require("simple-oauth2").create(credentials); //TO-D0: Get rid of this unecessary dependency
+
+  const client_id =
+    process.env.NODE_ENV === "development"
+      ? process.env.DEV_CLIENT_ID
+      : process.env.PROD_CLIENT_ID;
   const authorizationUri = oauth2.authorizationCode.authorizeURL({
-    PROD_CLIENT_ID: process.env.PROD_CLIENT_ID,
+    client_id,
     redirect_uri,
     scope: "me",
     response_type: "code"
@@ -37,6 +43,14 @@ async function authorize(req, res, next) {
 async function getAccessToken(req, res, next) {
   const { query } = req;
   const { code } = query;
+  const client_id =
+    process.env.NODE_ENV === "development"
+      ? process.env.DEV_CLIENT_ID
+      : process.env.PROD_CLIENT_ID;
+  const client_secret =
+    process.env.NODE_ENV === "development"
+      ? process.env.DEV_CLIENT_SECRET
+      : process.env.PROD_CLIENT_SECRET;
   axios({
     method: "post",
     url: `https://api.genius.com/oauth/token`,
@@ -45,9 +59,9 @@ async function getAccessToken(req, res, next) {
     },
     data: {
       code,
-      PROD_CLIENT_SECRET: process.env.PROD_CLIENT_SECRET,
+      client_secret,
       grant_type: "authorization_code",
-      PROD_CLIENT_ID: process.env.PROD_CLIENT_ID,
+      client_id,
       redirect_uri,
       response_type: "code"
     }
