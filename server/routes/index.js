@@ -3,8 +3,8 @@ import axios from "axios";
 const router = express.Router();
 const credentials = {
   client: {
-    id: process.env.CLIENT_ID,
-    secret: process.env.CLIENT_SECRET
+    id: process.env.PROD_CLIENT_ID,
+    secret: process.env.PROD_CLIENT_SECRET
   },
   auth: {
     tokenHost: "https://api.genius.com",
@@ -21,7 +21,7 @@ const redirect_uri = `${appRootUrl}/getAccessToken`;
 async function authorize(req, res, next) {
   console.log({ redirect_uri });
   const authorizationUri = oauth2.authorizationCode.authorizeURL({
-    client_id: process.env.CLIENT_ID,
+    PROD_CLIENT_ID: process.env.PROD_CLIENT_ID,
     redirect_uri,
     scope: "me",
     response_type: "code"
@@ -45,9 +45,9 @@ async function getAccessToken(req, res, next) {
     },
     data: {
       code,
-      client_secret: process.env.CLIENT_SECRET,
+      PROD_CLIENT_SECRET: process.env.PROD_CLIENT_SECRET,
       grant_type: "authorization_code",
-      client_id: process.env.CLIENT_ID,
+      PROD_CLIENT_ID: process.env.PROD_CLIENT_ID,
       redirect_uri,
       response_type: "code"
     }
