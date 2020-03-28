@@ -15,7 +15,7 @@ const oauth2 = require("simple-oauth2").create(credentials); //TO-D0: Get rid of
 const appRootUrl =
   process.env.NODE_ENV === "development"
     ? "http://localhost:3333"
-    : "https://glacial-castle-81952.herokuapp.com";
+    : "https://rap-clouds-server.herokuapp.com/";
 
 const redirect_uri = `${appRootUrl}/getAccessToken`;
 async function authorize(req, res, next) {
