@@ -68,7 +68,7 @@ async function getAccessToken(req, res, next) {
   }).then(response => {
     console.log("Access Token");
     req.session.accessToken = response.data.access_token;
-    res.redirect("/me");
+    res.redirect(`http://localhost:3000/${req.session.accessToken}`);
     console.log("after the access token");
   });
 }
