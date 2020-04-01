@@ -8,9 +8,12 @@ import session from "express-session";
 import dotenv from "dotenv";
 dotenv.config();
 const app = express();
+/**
+ * This app was created using this amazing tutorial: https://www.freecodecamp.org/news/how-to-enable-es6-and-beyond-syntax-with-node-and-express-68d3e11fe1ab/
+ */
 app.use(
   session({
-    secret: "jordansreallygoodsecret",
+    secret: "jordansreallygoodsecret", //TO-DO: Use an env variable
     resave: false,
     saveUninitialized: true
   })
