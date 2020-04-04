@@ -1,77 +1,6 @@
 import express from "express";
 import axios from "axios";
 const router = express.Router();
-const appRootUrl =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:3333"
-    : "https://rap-clouds-server.herokuapp.com";
-
-const redirect_uri = `${appRootUrl}/getAccessToken`;
-
-async function authorize(req, res, next) {
-  const credentials = {
-    client: {
-      id: process.env.CLIENT_ID,
-      secret: process.env.CLIENT_SECRET
-    },
-
-    auth: {
-      tokenHost: "https://api.genius.com",
-      tokenPath: "/oauth/authorize"
-    }
-  };
-  const oauth2 = require("simple-oauth2").create(credentials); //TO-D0: Get rid of this unecessary dependency
-
-  const client_id =
-    process.env.NODE_ENV === "development"
-      ? process.env.DEV_CLIENT_ID
-      : process.env.PROD_CLIENT_ID;
-  const authorizationUri = oauth2.authorizationCode.authorizeURL({
-    client_id,
-    redirect_uri,
-    scope: "me",
-    response_type: "code"
-    // state: '<state>'
-  });
-  console.log({ authorizationUri });
-  // Redirect example using Express (see http://expressjs.com/api.html#res.redirect)
-  res.redirect(authorizationUri);
-  console.log("******************AFTER THE REDIRECT");
-  //not sure what to do here.
-}
-
-async function getAccessToken(req, res, next) {
-  const { query } = req;
-  const { code } = query;
-  const client_id =
-    process.env.NODE_ENV === "development"
-      ? process.env.DEV_CLIENT_ID
-      : process.env.PROD_CLIENT_ID;
-  const client_secret =
-    process.env.NODE_ENV === "development"
-      ? process.env.DEV_CLIENT_SECRET
-      : process.env.PROD_CLIENT_SECRET;
-  axios({
-    method: "post",
-    url: `https://api.genius.com/oauth/token`,
-    headers: {
-      accept: "application/json"
-    },
-    data: {
-      code,
-      client_secret,
-      grant_type: "authorization_code",
-      client_id,
-      redirect_uri,
-      response_type: "code"
-    }
-  }).then(response => {
-    console.log("Access Token");
-    req.session.accessToken = response.data.access_token;
-    res.redirect(`http://localhost:3333/search?q=asap`);
-    console.log("after the access token");
-  });
-}
 
 async function search(req, res, next) {
   const { query } = req;
@@ -86,17 +15,17 @@ async function search(req, res, next) {
     headers: {
       accept: "application/json",
       // host: "api.genius.com",
-      authorization: `Bearer ${accessToken}`
+      authorization: `Bearer ${accessToken}`,
     },
     params: {
-      q
-    }
+      q,
+    },
   })
-    .then(response => {
+    .then((response) => {
       const { data } = response;
       res.send(data);
     })
-    .catch(err => {
+    .catch((err) => {
       console.log("SEARCH CALL FAILED!!!", err);
       res.redirect("/authorize");
     });
@@ -115,33 +44,7 @@ const views = (req, res, next) => {
   }
 };
 
-const getMe = async (req, res, next) => {
-  const { accessToken } = req.session;
-  if (!accessToken) {
-    res.write(`<a href="/authorize">Sign in first</a>`);
-  }
-  axios({
-    method: "get",
-    url: `https://api.genius.com/account`,
-    headers: {
-      accept: "application/json",
-      // host: "api.genius.com",
-      authorization: `Bearer ${accessToken}`
-    }
-  })
-    .then(response => {
-      const { data } = response;
-      res.send(data);
-    })
-    .catch(err => {
-      console.log("ACCOUNT CALL FAILED!!!", err);
-      res.redirect("/authorize");
-    });
-};
 /* GET home page. */
-router.get("/authorize", authorize);
-router.get("/getAccessToken", getAccessToken);
 router.get("/search", search);
 router.get("/views", views);
-router.get("/me", getMe);
 export default router;

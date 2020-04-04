@@ -21,7 +21,7 @@ dotenv.config();
 // Accept requests from the client
 app.use(
   cors({
-    origin: "http://localhost:3000" //TO-DO: Use env vars to distinguish b/t dev & prod
+    origin: "http://localhost:3000", //TO-DO: Use env vars to distinguish b/t dev & prod
   })
 );
 
@@ -29,13 +29,15 @@ app.use(
 app.use(
   session({
     secret: "jordansreallygoodsecret", //TO-DO: Use an env variable
-    resave: false,
-    saveUninitialized: true
+    resave: true,
+    saveUninitialized: true,
+    //TO-DO: Should I use genId here?
   })
 );
 
 //passport initialization
 app.use(passport.initialize());
+app.use(passport.session());
 passportInit();
 app.use(logger("dev"));
 app.use(express.json());
