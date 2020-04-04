@@ -8,6 +8,7 @@ import app from "../app";
 import debugLib from "debug";
 import http from "http";
 const debug = debugLib("your-project-name:server");
+const socketio = require("socket.io");
 /**
  * Get port from environment and store in Express.
  */
@@ -20,6 +21,12 @@ app.set("port", port);
  */
 
 var server = http.createServer(app);
+
+/** Connecting sockets to the server and adding them to the request
+ * so that we can access them later in the controller
+ */
+const io = socketio(server);
+app.set("io", io);
 
 /**
  * Listen on provided port, on all network interfaces.
