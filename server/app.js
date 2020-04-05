@@ -14,6 +14,8 @@ import session from "express-session";
 import dotenv from "dotenv";
 import passportInit from "./passportInit";
 import authRouter from "./routes/auth";
+const mongoose = require("mongoose");
+const MongoStore = require("connect-mongo")(session);
 const app = express();
 //env variables
 dotenv.config();
@@ -25,12 +27,25 @@ app.use(
   })
 );
 
+mongoose.connect(
+  `mongodb+srv://myself:${process.env.DB_PASSWORD}@cluster0-xlyk2.mongodb.net/test?retryWrites=true&w=majority`,
+  { useNewUrlParser: true, useUnifiedTopology: true }
+);
+mongoose.Promise = global.Promise;
+const db = mongoose.connection;
+db.on("error", console.error.bind(console, "connection error:"));
+db.once("open", function () {
+  console.log("db connected");
+  // we're connected!
+});
+
 //Set up for express-session
 app.use(
   session({
     secret: "jordansreallygoodsecret", //TO-DO: Use an env variable
     resave: true,
     saveUninitialized: true,
+    store: new MongoStore({ mongooseConnection: db }),
     //TO-DO: Should I use genId here?
   })
 );
