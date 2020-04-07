@@ -47,8 +47,8 @@ const UserSchema = new mongoose.Schema(
                 }
             }
         },
-        custom_header_image_url: null,
-        email: "lilj391850@yahoo.com",
+        custom_header_image_url: String,
+        email: String,
         followed_users_count: Number,
         followers_count: Number,
         header_image_url: String,
