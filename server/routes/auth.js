@@ -3,7 +3,7 @@
 import express from "express";
 import passport from "passport";
 import axios from "axios";
-
+import User from '../db/models/User';
 const router = express.Router();
 
 export const getAccessToken = (req, res) => {
@@ -44,7 +44,7 @@ export const getAccessToken = (req, res) => {
         process.env.NODE_ENV === "development"
           ? "http://localhost:3333"
           : "https://rap-clouds-server.herokuapp.com"
-      }/getGeniusAccount`;
+        }/getGeniusAccount`;
       res.redirect(getGeniusAccountURL);
     })
     .catch((err) => {
@@ -56,29 +56,38 @@ export const getAccessToken = (req, res) => {
 const getGeniusAccount = async (req, res, next) => {
   const { accessToken } = req.session;
   if (!accessToken) {
-    res.write(`<a href="/authorize">Sign in first</a>`);
+    res.status(401).json({ status: 401, statusText: "Missing access token. Please sign in first" });
   }
   const io = req.app.get("io");
-  axios({
-    method: "get",
-    url: `https://api.genius.com/account`,
-    headers: {
-      accept: "application/json",
-      // host: "api.genius.com",
-      authorization: `Bearer ${accessToken}`,
-    },
-  })
-    .then((response) => {
-      //TO-DO: Save the user & accessToken to a DB here.
-      const { data: user } = response;
-      req.session.user = user;
-      io.in(req.session.socketId).emit("genius", user);
-      res.send(user); //or should it be res.end?
+  try {
+    const { data } = await axios({
+      method: "get",
+      url: `https://api.genius.com/account`,
+      headers: {
+        accept: "application/json",
+        // host: "api.genius.com",
+        authorization: `Bearer ${accessToken}`,
+      },
     })
-    .catch((err) => {
-      console.log("ACCOUNT CALL FAILED!!!", err);
-      res.redirect("/authorize/genius");
-    });
+    if (data) {
+      //TO-DO: Save the user & accessToken to a DB here.
+      let { user } = data.response;
+      let mongooseUser = await User.findOne({ id: user.id }, (err, mongooseUser) => {
+        return mongooseUser;
+      })
+      if (!mongooseUser) {
+        mongooseUser = new User(user);
+      }
+      mongooseUser.accessToken = accessToken;
+      mongooseUser.save();
+      io.in(req.session.socketId).emit("genius", mongooseUser);
+      res.end();
+    }
+  } catch (err) {
+    console.log("ACCOUNT CALL FAILED!!!", err);
+    res.redirect("/authorize/genius");
+  }
+
 };
 
 router.get("/getGeniusAccount", getGeniusAccount);
