@@ -13,27 +13,29 @@ async function search(req, res, next) {
     // made a mistake with the line above and this helped me out:
     //https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
   }
-
-  axios({
-    method: "get",
-    url: `https://api.genius.com/search`,
-    headers: {
-      accept: "application/json",
-      // host: "api.genius.com",
-      authorization: `Bearer ${accessToken}`,
-    },
-    params: {
-      q,
-    },
-  })
-    .then((response) => {
-      const { data } = response;
-      res.send(data);
-    })
-    .catch((err) => {
-      console.log("SEARCH CALL FAILED!!!", err);
-      res.redirect("/authorize");
+  try {
+    const { data } = await axios({
+      method: "get",
+      url: `https://api.genius.com/search`,
+      headers: {
+        accept: "application/json",
+        // host: "api.genius.com",
+        authorization: `Bearer ${accessToken}`,
+      },
+      params: {
+        q,
+      },
     });
+    const { meta, response } = data
+    const { status } = meta;
+    const { hits } = response;
+    const songs = hits.map((hit) => hit.result);
+    res.status(status).json({ songs });
+  } catch (err) {
+    const { status, statusText } = err.response;
+    res.status(401).json({ status, statusText });
+  }
+
 }
 
 const views = (req, res, next) => {
