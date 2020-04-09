@@ -98,7 +98,8 @@ const UserSchema = new mongoose.Schema(
             pyongs_count: Number,
             questions_count: Number,
             transcriptions_count: Number
-        }
+        },
+        accessToken: String
     }
 )
 

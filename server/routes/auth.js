@@ -59,33 +59,35 @@ const getGeniusAccount = async (req, res, next) => {
     res.status(401).json({ status: 401, statusText: "Missing access token. Please sign in first" });
   }
   const io = req.app.get("io");
-  axios({
-    method: "get",
-    url: `https://api.genius.com/account`,
-    headers: {
-      accept: "application/json",
-      // host: "api.genius.com",
-      authorization: `Bearer ${accessToken}`,
-    },
-  })
-    .then((response) => {
-      //TO-DO: Save the user & accessToken to a DB here.
-      const { data } = response;
-      const { user } = data.response;
-      const mongooseUser = User.findOne({ id: user.id }, (err, _user) => {
-        console.log("inside query", _user)
-        return _user;
-      }) || new User(user);
-      console.log({ mongooseUser, user })
-      user.accessToken = accessToken;
-      mongooseUser.save();
-      io.in(req.session.socketId).emit("genius", user);
-      res.end();
+  try {
+    const { data } = await axios({
+      method: "get",
+      url: `https://api.genius.com/account`,
+      headers: {
+        accept: "application/json",
+        // host: "api.genius.com",
+        authorization: `Bearer ${accessToken}`,
+      },
     })
-    .catch((err) => {
-      console.log("ACCOUNT CALL FAILED!!!", err);
-      res.redirect("/authorize/genius");
-    });
+    if (data) {
+      //TO-DO: Save the user & accessToken to a DB here.
+      let { user } = data.response;
+      let mongooseUser = await User.findOne({ id: user.id }, (err, mongooseUser) => {
+        return mongooseUser;
+      })
+      if (!mongooseUser) {
+        mongooseUser = new User(user);
+      }
+      mongooseUser.accessToken = accessToken;
+      mongooseUser.save();
+      io.in(req.session.socketId).emit("genius", mongooseUser);
+      res.end();
+    }
+  } catch (err) {
+    console.log("ACCOUNT CALL FAILED!!!", err);
+    res.redirect("/authorize/genius");
+  }
+
 };
 
 router.get("/getGeniusAccount", getGeniusAccount);
