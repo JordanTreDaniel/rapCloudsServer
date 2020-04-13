@@ -59,11 +59,9 @@ async function getSongDetails(req, res, next) {
 			}
 		});
 		const { meta, response } = data;
-		console.log('GOT A SONG!', { meta, response });
 		const { status } = meta;
 		const { song } = response;
 		const { path } = song;
-		console.log({ path });
 		const { status: lyricStatus, data: lyricData } = await axios({
 			method: 'get',
 			url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
@@ -78,7 +76,6 @@ async function getSongDetails(req, res, next) {
 		});
 		if (lyricStatus === 200) {
 			const { lyrics } = lyricData;
-			console.log('LYRICS', lyrics);
 			song.lyrics = lyrics || 'Lamda call could not find lyrics';
 		}
 		res.status(status).json({ song });
