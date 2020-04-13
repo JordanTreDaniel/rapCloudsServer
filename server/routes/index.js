@@ -85,7 +85,7 @@ async function getSongDetails(req, res, next) {
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
-		res.status(401).json({ status, statusText });
+		res.status(status).json({ status, statusText });
 	}
 }
 
