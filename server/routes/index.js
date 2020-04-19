@@ -1,5 +1,7 @@
 import express from 'express';
 import axios from 'axios';
+import Song from '../db/models/Song';
+
 const router = express.Router();
 
 async function search(req, res, next) {
@@ -30,7 +32,17 @@ async function search(req, res, next) {
 		const { status } = meta;
 		const { hits } = response;
 		const songs = hits.map((hit) => hit.result);
-		res.status(status).json({ songs });
+		const mongooseSongs = songs.map(async (song) => {
+			let mongooseSong = await Song.findOne({ id: song.id }, (err, foundInstance) => {
+				return foundInstance;
+			  }) 
+			  if (!mongooseSong) {
+				mongooseSong = new Song(song);
+				mongooseSong.save()
+			  }
+			  return mongooseSong;	
+		})
+		res.status(status).json({ songs: mongooseSongs });
 	} catch (err) {
 		const { status, statusText } = err.response;
 		res.status(401).json({ status, statusText });
