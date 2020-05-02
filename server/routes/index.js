@@ -99,6 +99,51 @@ async function getSongDetails(req, res, next) {
 	}
 }
 
+async function getArtistDetails(req, res, next) {
+	const { params, headers } = req;
+	const { artistId } = params;
+	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
+	const { authorization: accessToken } = headers;
+	if (!accessToken) {
+		res.status(401).json({ status: 401, statusText: 'Missing access token. Please sign in first' });
+	}
+
+	try {
+		const { data } = await axios({
+			method: 'get',
+			url: `https://api.genius.com/artists/${artistId}`,
+			headers: {
+				accept: 'application/json',
+				// host: "api.genius.com",
+				authorization: `Bearer ${accessToken}`
+			}
+		});
+		const { meta, response } = data;
+
+		const { status } = meta;
+		const { artist } = response;
+
+		const { data: artistSongsData } = await axios({
+			method: 'get',
+			url: `https://api.genius.com/artists/${artistId}/songs`,
+			headers: {
+				accept: 'application/json',
+				// host: "api.genius.com",
+				authorization: `Bearer ${accessToken}`
+			}
+		});
+		const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
+		const { songs, next_page } = songsDataResponse; //next_page indicates more songs
+		//TO-DO: Save both the artist & the songs!
+		artist.songs = songs;
+		res.status(status).json({ artist });
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG', err);
+		const { status, statusText } = err.response;
+		res.status(status).json({ status, statusText });
+	}
+}
+
 const views = (req, res, next) => {
 	if (req.session.views) {
 		req.session.views++;
@@ -115,5 +160,6 @@ const views = (req, res, next) => {
 /* GET home page. */
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
+router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/views', views);
 export default router;
