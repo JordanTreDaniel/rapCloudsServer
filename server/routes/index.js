@@ -99,6 +99,45 @@ async function getSongDetails(req, res, next) {
 	}
 }
 
+async function makeWordCloud(req, res, next) {
+	const { params, headers, body } = req;
+	const { lyricJSON } = body;
+	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
+	// const { authorization: accessToken } = headers;
+	// if (!accessToken) {
+	// 	res.status(401).json({ status: 401, statusText: 'Missing access token. Please sign in first' });
+	// 	// made a mistake with the line above and this helped me out:
+	// 	//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
+	// }
+	console.log('lyricJSON', lyricJSON);
+	const { lyricString } = lyricJSON;
+
+	try {
+		const { data, status, error } = await axios({
+			method: 'post',
+			url: `https://o049r3fygh.execute-api.us-east-1.amazonaws.com/dev`,
+			headers: {
+				'Content-Type': 'application/json',
+				// 'Accept-Encoding': 'gzip',
+				'Access-Control-Allow-Origin': '*'
+				// 'Access-Control-Allow-Headers': 'Content-Type',
+				// Accept: 'application/json'
+			},
+			data: {
+				lyricJSON: {
+					lyricString
+				}
+			}
+		});
+		console.log('data', data);
+		res.status(200).json({ data });
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG', err);
+		const { status, statusText } = err.response;
+		res.status(status).json({ status, statusText });
+	}
+}
+
 async function getArtistDetails(req, res, next) {
 	const { params, headers } = req;
 	const { artistId } = params;
@@ -162,4 +201,5 @@ router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/views', views);
+router.post('/makeWordCloud', makeWordCloud);
 export default router;
