@@ -1,6 +1,7 @@
 import express from 'express';
 import axios from 'axios';
 import Song from '../db/models/Song';
+import os from 'os';
 
 const router = express.Router();
 
@@ -109,13 +110,15 @@ async function makeWordCloud(req, res, next) {
 	// 	// made a mistake with the line above and this helped me out:
 	// 	//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
 	// }
-	console.log('lyricJSON', lyricJSON);
+
 	const { lyricString } = lyricJSON;
 
 	try {
+		const isLocalBuild = os.hostname().indexOf('local') > -1;
+
 		const { data, status, error } = await axios({
 			method: 'post',
-			url: `https://o049r3fygh.execute-api.us-east-1.amazonaws.com/dev`,
+			url: isLocalBuild ? 'http://localhost:5000' : `https://o049r3fygh.execute-api.us-east-1.amazonaws.com/dev`,
 			headers: {
 				'Content-Type': 'application/json',
 				// 'Accept-Encoding': 'gzip',
@@ -129,7 +132,7 @@ async function makeWordCloud(req, res, next) {
 				}
 			}
 		});
-		console.log('data', data);
+
 		res.status(200).json({ data });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
