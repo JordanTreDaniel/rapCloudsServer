@@ -114,7 +114,7 @@ async function makeWordCloud(req, res, next) {
 	const { lyricString } = lyricJSON;
 
 	try {
-		const isLocalBuild = os.hostname().indexOf('local') > -1;
+		const isLocalBuild = headers.host.match('localhost');
 
 		const { data, status, error } = await axios({
 			method: 'post',
