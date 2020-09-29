@@ -14,11 +14,19 @@ import session from 'express-session';
 import dotenv from 'dotenv';
 import passportInit from './passportInit';
 import authRouter from './routes/auth';
+// import Mask from './db/models/Mask';
 const mongoose = require('mongoose');
 const MongoStore = require('connect-mongo')(session);
 const app = express();
 //env variables
 dotenv.config();
+
+// var imgPath = './ignore/cloud-with-moon.png';
+
+// var mask = new Mask();
+// mask.img.data = fs.readFileSync(imgPath);
+// mask.img.contentType = 'image/png';
+// mask.save();
 
 const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'http://www.rapclouds.com';
 // Accept requests from the client
