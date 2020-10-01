@@ -2,6 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import Song from '../db/models/Song';
 import os from 'os';
+import Mask from '../db/models/Mask';
 
 const router = express.Router();
 
@@ -113,6 +114,10 @@ async function getSongLyrics(req, res, next) {
 async function makeWordCloud(req, res, next) {
 	const { params, headers, body } = req;
 	const { lyricJSON } = body;
+	const mask = await Mask.findById('5f727b93af27887f7d258557', (err, foundMask) => {
+		return foundMask;
+	});
+
 	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
 	// const { authorization: accessToken } = headers;
 	// if (!accessToken) {
@@ -137,9 +142,8 @@ async function makeWordCloud(req, res, next) {
 				// Accept: 'application/json'
 			},
 			data: {
-				lyricJSON: {
-					lyricString
-				}
+				lyricString,
+				encodedMask: mask.img.data.toString('base64')
 			}
 		});
 
