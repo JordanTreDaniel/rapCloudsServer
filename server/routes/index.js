@@ -2,6 +2,7 @@ import express from 'express';
 import axios from 'axios';
 import Song from '../db/models/Song';
 import os from 'os';
+import Mask from '../db/models/Mask';
 
 const router = express.Router();
 
@@ -61,7 +62,6 @@ async function getSongDetails(req, res, next) {
 		// made a mistake with the line above and this helped me out:
 		//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
 	}
-
 	try {
 		const { data } = await axios({
 			method: 'get',
@@ -75,7 +75,21 @@ async function getSongDetails(req, res, next) {
 		const { meta, response } = data;
 		const { status } = meta;
 		const { song } = response;
-		const { path } = song;
+		res.status(status).json({ song });
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG', err);
+		const { status, statusText } = err.response;
+		res.status(status).json({ status, statusText });
+	}
+}
+
+async function getSongLyrics(req, res, next) {
+	const { body } = req;
+	const { songPath } = body;
+	if (!songPath) {
+		res.status(400).json({ status: 400, statusText: 'Path to page with lyrics is required.' });
+	}
+	try {
 		const { status: lyricStatus, data: lyricData } = await axios({
 			method: 'get',
 			url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
@@ -85,14 +99,11 @@ async function getSongDetails(req, res, next) {
 				// authorization: `Bearer ${accessToken}`
 			},
 			params: {
-				lyricsPath: path
+				lyricsPath: songPath
 			}
 		});
-		if (lyricStatus === 200) {
-			const { lyrics } = lyricData;
-			song.lyrics = lyrics || 'Lamda call could not find lyrics';
-		}
-		res.status(status).json({ song });
+		const { lyrics = 'Lamda call could not find lyrics' } = lyricData;
+		res.status(lyricStatus).json({ lyrics });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
@@ -103,6 +114,10 @@ async function getSongDetails(req, res, next) {
 async function makeWordCloud(req, res, next) {
 	const { params, headers, body } = req;
 	const { lyricJSON } = body;
+	const mask = await Mask.findById('5f727b93af27887f7d258557', (err, foundMask) => {
+		return foundMask;
+	});
+
 	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
 	// const { authorization: accessToken } = headers;
 	// if (!accessToken) {
@@ -127,9 +142,8 @@ async function makeWordCloud(req, res, next) {
 				// Accept: 'application/json'
 			},
 			data: {
-				lyricJSON: {
-					lyricString
-				}
+				lyricString,
+				encodedMask: mask.img.data.toString('base64')
 			}
 		});
 
@@ -205,4 +219,5 @@ router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/views', views);
 router.post('/makeWordCloud', makeWordCloud);
+router.post('/getSongLyrics', getSongLyrics);
 export default router;
