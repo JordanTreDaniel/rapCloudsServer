@@ -24,11 +24,11 @@ async function search(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
+				authorization: `Bearer ${accessToken}`,
 			},
 			params: {
-				q
-			}
+				q,
+			},
 		});
 		const { meta, response } = data;
 		const { status } = meta;
@@ -69,8 +69,8 @@ async function getSongDetails(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
-			}
+				authorization: `Bearer ${accessToken}`,
+			},
 		});
 		const { meta, response } = data;
 		const { status } = meta;
@@ -94,13 +94,13 @@ async function getSongLyrics(req, res, next) {
 			method: 'get',
 			url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
 			headers: {
-				accept: 'application/json'
+				accept: 'application/json',
 				// host: "api.genius.com",
 				// authorization: `Bearer ${accessToken}`
 			},
 			params: {
-				lyricsPath: songPath
-			}
+				lyricsPath: songPath,
+			},
 		});
 		const { lyrics = 'Lamda call could not find lyrics' } = lyricData;
 		res.status(lyricStatus).json({ lyrics });
@@ -113,7 +113,7 @@ async function getSongLyrics(req, res, next) {
 
 async function makeWordCloud(req, res, next) {
 	const { params, headers, body } = req;
-	const { lyricJSON } = body;
+	const { lyricString, cloudSettings } = body;
 	const mask = await Mask.findById('5f727b93af27887f7d258557', (err, foundMask) => {
 		return foundMask;
 	});
@@ -126,8 +126,6 @@ async function makeWordCloud(req, res, next) {
 	// 	//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
 	// }
 
-	const { lyricString } = lyricJSON;
-
 	try {
 		const isLocalBuild = headers.host.match('localhost');
 
@@ -137,14 +135,15 @@ async function makeWordCloud(req, res, next) {
 			headers: {
 				'Content-Type': 'application/json',
 				// 'Accept-Encoding': 'gzip',
-				'Access-Control-Allow-Origin': '*'
+				'Access-Control-Allow-Origin': '*',
 				// 'Access-Control-Allow-Headers': 'Content-Type',
 				// Accept: 'application/json'
 			},
 			data: {
 				lyricString,
-				encodedMask: mask.img.data.toString('base64')
-			}
+				encodedMask: mask.img.data.toString('base64'),
+				cloudSettings,
+			},
 		});
 
 		res.status(200).json({ data });
@@ -171,8 +170,8 @@ async function getArtistDetails(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
-			}
+				authorization: `Bearer ${accessToken}`,
+			},
 		});
 		const { meta, response } = data;
 
@@ -185,8 +184,8 @@ async function getArtistDetails(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
-			}
+				authorization: `Bearer ${accessToken}`,
+			},
 		});
 		const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
 		const { songs, next_page } = songsDataResponse; //next_page indicates more songs
