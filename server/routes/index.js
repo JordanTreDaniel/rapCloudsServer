@@ -3,6 +3,7 @@ import axios from 'axios';
 import Song from '../db/models/Song';
 import os from 'os';
 import Mask from '../db/models/Mask';
+import seedDB from '../db/seed';
 
 const router = express.Router();
 
@@ -112,12 +113,10 @@ async function getSongLyrics(req, res, next) {
 }
 
 async function makeWordCloud(req, res, next) {
-	const { params, headers, body } = req;
-	const { lyricString, cloudSettings } = body;
-	const mask = await Mask.findById('5f727b93af27887f7d258557', (err, foundMask) => {
-		return foundMask;
-	});
-
+	const { headers, body } = req;
+	const { lyricString, cloudSettings, maskId } = body;
+	const mask = await Mask.findById(maskId).exec();
+	console.log('mask', mask);
 	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
 	// const { authorization: accessToken } = headers;
 	// if (!accessToken) {
@@ -212,6 +211,24 @@ const views = (req, res, next) => {
 	}
 };
 
+async function getMasks(req, res, next) {
+	try {
+		Mask.find({}, function(err, masks) {
+			res.status(200).json(masks);
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
+async function seed(req, res, next) {
+	try {
+		await seedDB();
+		res.status(200).json('Done!');
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
 /* GET home page. */
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
@@ -219,4 +236,7 @@ router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/views', views);
 router.post('/makeWordCloud', makeWordCloud);
 router.post('/getSongLyrics', getSongLyrics);
+router.post('/getSongLyrics', getSongLyrics);
+router.get('/masks', getMasks);
+router.get('/seed', seed);
 export default router;
