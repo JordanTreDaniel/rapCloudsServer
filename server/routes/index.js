@@ -114,8 +114,9 @@ async function getSongLyrics(req, res, next) {
 
 async function makeWordCloud(req, res, next) {
 	const { headers, body } = req;
-	const { lyricString, cloudSettings, maskId } = body;
-	const mask = await Mask.findById(maskId).exec();
+	const { lyricString, cloudSettings } = body;
+	const { maskId } = cloudSettings;
+	const mask = maskId ? await Mask.findById(maskId).exec() : null;
 	console.log('mask', mask);
 	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
 	// const { authorization: accessToken } = headers;
@@ -140,7 +141,7 @@ async function makeWordCloud(req, res, next) {
 			},
 			data: {
 				lyricString,
-				encodedMask: mask.img.data.toString('base64'),
+				encodedMask: mask && mask.img.data.toString('base64'),
 				cloudSettings,
 			},
 		});
@@ -214,7 +215,13 @@ const views = (req, res, next) => {
 async function getMasks(req, res, next) {
 	try {
 		Mask.find({}, function(err, masks) {
-			res.status(200).json(masks);
+			res.status(200).json({
+				masks: masks.map((mask) => ({
+					name: mask.name,
+					id: mask._id,
+					base64Img: mask.img.data.toString('base64'),
+				})),
+			});
 		});
 	} catch (error) {
 		res.status(500).json(error);
