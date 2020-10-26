@@ -16,7 +16,6 @@ import authRouter from './routes/auth';
 const mongoose = require('mongoose');
 const MongoStore = require('connect-mongo')(session);
 const app = express();
-import seedDB from './db/seed';
 
 //env variables
 dotenv.config();
@@ -40,7 +39,6 @@ db.once('open', function() {
 	console.log('db connected');
 	// we're connected!
 });
-// seedDB();
 
 //Set up for express-session
 app.use(
