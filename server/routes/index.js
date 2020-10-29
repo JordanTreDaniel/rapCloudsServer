@@ -228,6 +228,29 @@ async function getMasks(req, res, next) {
 	}
 }
 
+async function addMask(req, res, next) {
+	const { body } = req;
+	const { newMask } = body;
+	try {
+		let mask = new Mask({
+			userId: newMask.userId,
+			name: newMask.userId,
+			img: { data: Buffer.from(newMask.base64Img, 'base64'), contentType: newMask.type },
+		});
+		mask = await mask.save();
+		console.log('mask', mask);
+		res.status(200).json({
+			mask: {
+				name: mask.name,
+				id: mask._id,
+				base64Img: mask.img.data.toString('base64'),
+			},
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
 async function seed(req, res, next) {
 	try {
 		await seedDB();
@@ -245,5 +268,6 @@ router.post('/makeWordCloud', makeWordCloud);
 router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks', getMasks);
+router.post('/addMask', addMask);
 router.get('/seed', seed);
 export default router;
