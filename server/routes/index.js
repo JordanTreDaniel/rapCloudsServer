@@ -213,8 +213,10 @@ const views = (req, res, next) => {
 };
 
 async function getMasks(req, res, next) {
+	const { params } = req;
+	const { u = 'default' } = params;
 	try {
-		Mask.find({}, function(err, masks) {
+		Mask.find({ userId: { $in: [ undefined, u ] } }, function(err, masks) {
 			res.status(200).json({
 				masks: masks.map((mask) => ({
 					name: mask.name,
@@ -267,7 +269,7 @@ router.get('/views', views);
 router.post('/makeWordCloud', makeWordCloud);
 router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
-router.get('/masks', getMasks);
+router.get('/masks/:u?', getMasks);
 router.post('/addMask', addMask);
 router.get('/seed', seed);
 export default router;
