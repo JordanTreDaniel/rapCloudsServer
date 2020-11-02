@@ -148,9 +148,9 @@ async function makeWordCloud(req, res, next) {
 
 		res.status(200).json({ data });
 	} catch (err) {
-		console.log('SOMETHING WENT WRONG', err);
-		const { status, statusText } = err.response;
-		res.status(status).json({ status, statusText });
+		const { status, statusText, data } = err.response;
+		console.log('SOMETHING WENT WRONG', { status, statusText, data });
+		res.status(status).json({ status, statusText, data });
 	}
 }
 
