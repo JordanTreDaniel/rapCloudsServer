@@ -20,7 +20,7 @@ const app = express();
 //env variables
 dotenv.config();
 
-const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'http://www.rapclouds.com';
+const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.rapclouds.com';
 // Accept requests from the client
 app.use(
 	cors({
