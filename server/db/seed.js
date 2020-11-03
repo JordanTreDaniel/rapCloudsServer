@@ -10,12 +10,13 @@ const seedDB = async () => {
 		await Mask.collection.drop();
 	}
 
-	const paths = [ './ignore/drake.png', './ignore/cloud-with-moon.png' ];
-
-	paths.forEach((path) => {
+	const ignoreDir = fs.readdirSync('./ignore');
+	ignoreDir.forEach((fileName) => {
+		const [ name, ext ] = fileName.split('.');
 		const mask = new Mask();
-		mask.img.data = fs.readFileSync(path);
-		mask.img.contentType = 'image/png';
+		mask.name = name;
+		mask.img.data = fs.readFileSync(`./ignore/${fileName}`);
+		mask.img.contentType = `image/${ext}`;
 		mask.save();
 	});
 };
