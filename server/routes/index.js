@@ -3,6 +3,7 @@ import axios from 'axios';
 import Song from '../db/models/Song';
 import os from 'os';
 import Mask from '../db/models/Mask';
+import seedDB from '../db/seed';
 
 const router = express.Router();
 
@@ -24,11 +25,11 @@ async function search(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
+				authorization: `Bearer ${accessToken}`,
 			},
 			params: {
-				q
-			}
+				q,
+			},
 		});
 		const { meta, response } = data;
 		const { status } = meta;
@@ -69,8 +70,8 @@ async function getSongDetails(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
-			}
+				authorization: `Bearer ${accessToken}`,
+			},
 		});
 		const { meta, response } = data;
 		const { status } = meta;
@@ -94,13 +95,13 @@ async function getSongLyrics(req, res, next) {
 			method: 'get',
 			url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
 			headers: {
-				accept: 'application/json'
+				accept: 'application/json',
 				// host: "api.genius.com",
 				// authorization: `Bearer ${accessToken}`
 			},
 			params: {
-				lyricsPath: songPath
-			}
+				lyricsPath: songPath,
+			},
 		});
 		const { lyrics = 'Lamda call could not find lyrics' } = lyricData;
 		res.status(lyricStatus).json({ lyrics });
@@ -112,12 +113,11 @@ async function getSongLyrics(req, res, next) {
 }
 
 async function makeWordCloud(req, res, next) {
-	const { params, headers, body } = req;
-	const { lyricJSON } = body;
-	const mask = await Mask.findById('5f727b93af27887f7d258557', (err, foundMask) => {
-		return foundMask;
-	});
-
+	const { headers, body } = req;
+	const { lyricString, cloudSettings } = body;
+	const { maskId } = cloudSettings;
+	const mask = maskId ? await Mask.findById(maskId).exec() : null;
+	console.log('mask', mask);
 	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
 	// const { authorization: accessToken } = headers;
 	// if (!accessToken) {
@@ -125,8 +125,6 @@ async function makeWordCloud(req, res, next) {
 	// 	// made a mistake with the line above and this helped me out:
 	// 	//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
 	// }
-
-	const { lyricString } = lyricJSON;
 
 	try {
 		const isLocalBuild = headers.host.match('localhost');
@@ -137,21 +135,22 @@ async function makeWordCloud(req, res, next) {
 			headers: {
 				'Content-Type': 'application/json',
 				// 'Accept-Encoding': 'gzip',
-				'Access-Control-Allow-Origin': '*'
+				'Access-Control-Allow-Origin': '*',
 				// 'Access-Control-Allow-Headers': 'Content-Type',
 				// Accept: 'application/json'
 			},
 			data: {
 				lyricString,
-				encodedMask: mask.img.data.toString('base64')
-			}
+				encodedMask: mask && mask.img.data.toString('base64'),
+				cloudSettings,
+			},
 		});
 
 		res.status(200).json({ data });
 	} catch (err) {
-		console.log('SOMETHING WENT WRONG', err);
-		const { status, statusText } = err.response;
-		res.status(status).json({ status, statusText });
+		const { status, statusText, data } = err.response;
+		console.log('SOMETHING WENT WRONG', { status, statusText, data });
+		res.status(status).json({ status, statusText, data });
 	}
 }
 
@@ -171,8 +170,8 @@ async function getArtistDetails(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
-			}
+				authorization: `Bearer ${accessToken}`,
+			},
 		});
 		const { meta, response } = data;
 
@@ -185,8 +184,8 @@ async function getArtistDetails(req, res, next) {
 			headers: {
 				accept: 'application/json',
 				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`
-			}
+				authorization: `Bearer ${accessToken}`,
+			},
 		});
 		const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
 		const { songs, next_page } = songsDataResponse; //next_page indicates more songs
@@ -213,6 +212,55 @@ const views = (req, res, next) => {
 	}
 };
 
+async function getMasks(req, res, next) {
+	const { params } = req;
+	const { u = 'default' } = params;
+	try {
+		Mask.find({ userId: { $in: [ undefined, u ] } }, function(err, masks) {
+			res.status(200).json({
+				masks: masks.map((mask) => ({
+					name: mask.name,
+					id: mask._id,
+					base64Img: mask.img.data.toString('base64'),
+				})),
+			});
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
+async function addMask(req, res, next) {
+	const { body } = req;
+	const { newMask } = body;
+	try {
+		let mask = new Mask({
+			userId: newMask.userId,
+			name: newMask.userId,
+			img: { data: Buffer.from(newMask.base64Img, 'base64'), contentType: newMask.type },
+		});
+		mask = await mask.save();
+		console.log('mask', mask);
+		res.status(200).json({
+			mask: {
+				name: mask.name,
+				id: mask._id,
+				base64Img: mask.img.data.toString('base64'),
+			},
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
+async function seed(req, res, next) {
+	try {
+		await seedDB();
+		res.status(200).json('Done!');
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
 /* GET home page. */
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
@@ -220,4 +268,8 @@ router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/views', views);
 router.post('/makeWordCloud', makeWordCloud);
 router.post('/getSongLyrics', getSongLyrics);
+router.post('/getSongLyrics', getSongLyrics);
+router.get('/masks/:u?', getMasks);
+router.post('/addMask', addMask);
+router.get('/seed', seed);
 export default router;

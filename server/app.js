@@ -3,7 +3,6 @@
  */
 import express from 'express';
 import path from 'path';
-import fs from 'fs';
 import cors from 'cors';
 import passport from 'passport';
 import cookieParser from 'cookie-parser';
@@ -14,31 +13,24 @@ import session from 'express-session';
 import dotenv from 'dotenv';
 import passportInit from './passportInit';
 import authRouter from './routes/auth';
-// import Mask from './db/models/Mask';
 const mongoose = require('mongoose');
 const MongoStore = require('connect-mongo')(session);
 const app = express();
+
 //env variables
 dotenv.config();
-
-// var imgPath = './ignore/cloud-with-moon.png';
-
-// var mask = new Mask();
-// mask.img.data = fs.readFileSync(imgPath);
-// mask.img.contentType = 'image/png';
-// mask.save();
 
 const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'http://www.rapclouds.com';
 // Accept requests from the client
 app.use(
 	cors({
-		origin: appRootUrl //TO-DO: Use env vars to distinguish b/t dev & prod
-	})
+		origin: appRootUrl, //TO-DO: Use env vars to distinguish b/t dev & prod
+	}),
 );
 
 mongoose.connect(
 	`mongodb+srv://myself:${process.env.DB_PASSWORD}@cluster0-xlyk2.mongodb.net/test?retryWrites=true&w=majority`,
-	{ useNewUrlParser: true, useUnifiedTopology: true }
+	{ useNewUrlParser: true, useUnifiedTopology: true },
 );
 mongoose.Promise = global.Promise;
 const db = mongoose.connection;
@@ -54,9 +46,9 @@ app.use(
 		secret: 'jordansreallygoodsecret', //TO-DO: Use an env variable
 		resave: true,
 		saveUninitialized: true,
-		store: new MongoStore({ mongooseConnection: db })
+		store: new MongoStore({ mongooseConnection: db }),
 		//TO-DO: Should I use genId here?
-	})
+	}),
 );
 
 //passport initialization
@@ -64,8 +56,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 passportInit();
 app.use(logger('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, '../public')));
 app.use('/', authRouter);
