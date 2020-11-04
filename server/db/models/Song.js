@@ -30,8 +30,8 @@ const SongSchema = new mongoose.Schema({
 		is_verified: Boolean,
 		name: String,
 		url: String,
-		lyrics: String
-	}
+	},
+	lyrics: String
 });
 
 export default mongoose.model('Song', SongSchema);

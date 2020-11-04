@@ -76,6 +76,13 @@ async function getSongDetails(req, res, next) {
 		const { meta, response } = data;
 		const { status } = meta;
 		const { song } = response;
+		let mongooseSong = await Song.findOne({ id: songId }, (err, foundInstance) => {
+			return foundInstance;
+		});
+		if (mongooseSong) {
+			Object.assign(mongooseSong, song);
+			const result = await mongooseSong.save();
+		}
 		res.status(status).json({ song });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
@@ -86,24 +93,37 @@ async function getSongDetails(req, res, next) {
 
 async function getSongLyrics(req, res, next) {
 	const { body } = req;
-	const { songPath } = body;
-	if (!songPath) {
-		res.status(400).json({ status: 400, statusText: 'Path to page with lyrics is required.' });
+	const { songPath, songId } = body;
+	if (!songPath || !songId) {
+		res.status(400).json({ status: 400, statusText: 'Path to page with lyrics, and song id are required.' });
 	}
 	try {
-		const { status: lyricStatus, data: lyricData } = await axios({
-			method: 'get',
-			url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
-			headers: {
-				accept: 'application/json',
-				// host: "api.genius.com",
-				// authorization: `Bearer ${accessToken}`
-			},
-			params: {
-				lyricsPath: songPath,
-			},
+		let tries = 1, lyrics = "", lyricStatus;
+		while (tries <= 3 && !lyrics.length) {
+			const { status: _lyricStatus, data: lyricData } = await axios({
+				method: 'get',
+				url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
+				headers: {
+					accept: 'application/json',
+					// host: "api.genius.com",
+					// authorization: `Bearer ${accessToken}`
+				},
+				params: {
+					lyricsPath: songPath,
+				},
+			});
+			lyrics = lyricData.lyrics || "";
+			lyricStatus = _lyricStatus;
+			tries++
+		}
+		let mongooseSong = await Song.findOne({ id: songId }, (err, foundInstance) => {
+			return foundInstance;
 		});
-		const { lyrics = 'Lamda call could not find lyrics' } = lyricData;
+		if (mongooseSong) {
+			mongooseSong.lyrics = lyrics;
+			// mongooseSong.markModified('lyrics');
+			const result = await mongooseSong.save();
+		}
 		res.status(lyricStatus).json({ lyrics });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
@@ -261,7 +281,7 @@ async function seed(req, res, next) {
 		res.status(500).json(error);
 	}
 }
-/* GET home page. */
+
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
