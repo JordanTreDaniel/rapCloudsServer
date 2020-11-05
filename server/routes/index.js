@@ -1,8 +1,8 @@
 import express from 'express';
 import axios from 'axios';
 import Song from '../db/models/Song';
-import os from 'os';
 import Mask from '../db/models/Mask';
+import Artist from '../db/models/Artist';
 import seedDB from '../db/seed';
 
 const router = express.Router();
@@ -63,7 +63,7 @@ async function getSongDetails(req, res, next) {
 		// made a mistake with the line above and this helped me out:
 		//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
 	}
-	try {
+	try {            
 		const { data } = await axios({
 			method: 'get',
 			url: `https://api.genius.com/songs/${songId}`,
@@ -74,14 +74,12 @@ async function getSongDetails(req, res, next) {
 			},
 		});
 		const { meta, response } = data;
-		const { status } = meta;
+		const { status } = meta; 
 		const { song } = response;
-		let mongooseSong = await Song.findOne({ id: songId }, (err, foundInstance) => {
-			return foundInstance;
-		});
+		let mongooseSong = await Song.findOne({ id: songId }).exec()
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
-			const result = await mongooseSong.save();
+			await mongooseSong.save();
 		}
 		res.status(status).json({ song });
 	} catch (err) {
@@ -196,8 +194,10 @@ async function getArtistDetails(req, res, next) {
 		const { meta, response } = data;
 
 		const { status } = meta;
-		const { artist } = response;
-
+		let { artist } = response;
+		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
+		artist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
+		await artist.save();
 		const { data: artistSongsData } = await axios({
 			method: 'get',
 			url: `https://api.genius.com/artists/${artistId}/songs`,
