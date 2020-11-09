@@ -63,7 +63,7 @@ async function getSongDetails(req, res, next) {
 		// made a mistake with the line above and this helped me out:
 		//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
 	}
-	try {            
+	try {
 		const { data } = await axios({
 			method: 'get',
 			url: `https://api.genius.com/songs/${songId}`,
@@ -74,9 +74,9 @@ async function getSongDetails(req, res, next) {
 			},
 		});
 		const { meta, response } = data;
-		const { status } = meta; 
+		const { status } = meta;
 		const { song } = response;
-		let mongooseSong = await Song.findOne({ id: songId }).exec()
+		let mongooseSong = await Song.findOne({ id: songId }).exec();
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
 			await mongooseSong.save();
@@ -96,7 +96,9 @@ async function getSongLyrics(req, res, next) {
 		res.status(400).json({ status: 400, statusText: 'Path to page with lyrics, and song id are required.' });
 	}
 	try {
-		let tries = 1, lyrics = "", lyricStatus;
+		let tries = 1,
+			lyrics = '',
+			lyricStatus;
 		while (tries <= 3 && !lyrics.length) {
 			const { status: _lyricStatus, data: lyricData } = await axios({
 				method: 'get',
@@ -110,9 +112,9 @@ async function getSongLyrics(req, res, next) {
 					lyricsPath: songPath,
 				},
 			});
-			lyrics = lyricData.lyrics || "";
+			lyrics = lyricData.lyrics || '';
 			lyricStatus = _lyricStatus;
-			tries++
+			tries++;
 		}
 		let mongooseSong = await Song.findOne({ id: songId }, (err, foundInstance) => {
 			return foundInstance;
@@ -172,6 +174,31 @@ async function makeWordCloud(req, res, next) {
 	}
 }
 
+const saveSongs = async (songs) => {
+	for (var song of songs) {
+		const { id: songId } = song;
+		let mongoSong = await Song.findOne({ id: songId }).exec();
+		mongoSong = mongoSong ? Object.assign(mongoSong, song) : new Song(song);
+		await mongoSong.save();
+	}
+};
+
+const apiFetchArtistSongs = async (artistId, accessToken, nextPage = 1) => {
+	const { data: artistSongsData } = await axios({
+		method: 'get',
+		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${20}&page=${nextPage}&sort=${'popularity'}`,
+		headers: {
+			accept: 'application/json',
+			// host: "api.genius.com",
+			authorization: `Bearer ${accessToken}`,
+		},
+	});
+	const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
+	const { songs: artistSongs, next_page } = songsDataResponse;
+	nextPage = next_page || null;
+	return { artistSongs, nextPage };
+};
+
 async function getArtistDetails(req, res, next) {
 	const { params, headers } = req;
 	const { artistId } = params;
@@ -198,20 +225,9 @@ async function getArtistDetails(req, res, next) {
 		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
 		artist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
 		await artist.save();
-		const { data: artistSongsData } = await axios({
-			method: 'get',
-			url: `https://api.genius.com/artists/${artistId}/songs`,
-			headers: {
-				accept: 'application/json',
-				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`,
-			},
-		});
-		const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
-		const { songs, next_page } = songsDataResponse; //next_page indicates more songs
-		//TO-DO: Save both the artist & the songs!
-		artist.songs = songs;
-		res.status(status).json({ artist });
+		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken);
+		res.status(status).json({ artist, songs, nextPage });
+		saveSongs(songs);
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
