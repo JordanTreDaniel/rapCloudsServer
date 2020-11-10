@@ -272,7 +272,7 @@ async function addMask(req, res, next) {
 	try {
 		let mask = new Mask({
 			userId: newMask.userId,
-			name: newMask.userId,
+			name: newMask.name,
 			img: { data: Buffer.from(newMask.base64Img, 'base64'), contentType: newMask.type },
 		});
 		mask = await mask.save();
