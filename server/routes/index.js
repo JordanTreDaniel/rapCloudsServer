@@ -258,6 +258,7 @@ async function getMasks(req, res, next) {
 					name: mask.name,
 					id: mask._id,
 					base64Img: mask.img.data.toString('base64'),
+					userId: mask.userId,
 				})),
 			});
 		});
