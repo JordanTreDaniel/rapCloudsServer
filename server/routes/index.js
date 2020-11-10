@@ -281,8 +281,22 @@ async function addMask(req, res, next) {
 			mask: {
 				name: mask.name,
 				id: mask._id,
-				base64Img: mask.img.data.toString('base64'),
+				base64Img: newMask.base64Img,
+				userId: newMask.userId,
 			},
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+async function deleteMask(req, res, next) {
+	const { body } = req;
+	const { maskId } = body;
+	try {
+		await Mask.findOneAndDelete({ _id: maskId }).exec();
+		res.status(200).json({
+			message: 'Deleted Successfully.',
+			maskId,
 		});
 	} catch (error) {
 		res.status(500).json(error);
@@ -307,5 +321,6 @@ router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks/:u?', getMasks);
 router.post('/addMask', addMask);
+router.post('/deleteMask', deleteMask);
 router.get('/seed', seed);
 export default router;
