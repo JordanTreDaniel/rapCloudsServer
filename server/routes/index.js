@@ -53,6 +53,13 @@ async function search(req, res, next) {
 	}
 }
 
+const fetchYtInfo = async (song) => {
+	const watchUrl = ((song.media || []).find((mediaInfo) => mediaInfo.provider === 'youtube') || {}).url;
+	if (!watchUrl) return { problem: "Couldn't find youtube media info on song." };
+	const res = await axios({ method: 'get', url: `https://www.youtube.com/oembed?url=${watchUrl}&format=json` });
+	return res;
+};
+
 async function getSongDetails(req, res, next) {
 	const { params, headers } = req;
 	const { songId } = params;
@@ -76,6 +83,8 @@ async function getSongDetails(req, res, next) {
 		const { meta, response } = data;
 		const { status } = meta;
 		const { song } = response;
+		const { data: ytData, error } = await fetchYtInfo(song);
+		if (!error) song.ytData = ytData;
 		let mongooseSong = await Song.findOne({ id: songId }).exec();
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
