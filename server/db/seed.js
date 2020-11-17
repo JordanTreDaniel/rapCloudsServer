@@ -11,8 +11,11 @@ const seedDB = async () => {
 	}
 
 	const ignoreDir = fs.readdirSync('./ignore');
-	ignoreDir.forEach((fileName) => {
+	ignoreDir.forEach((fileName, idx) => {
 		const [ name, ext ] = fileName.split('.');
+		if (!name.length) {
+			return;
+		}
 		const mask = new Mask();
 		mask.name = name;
 		mask.img.data = fs.readFileSync(`./ignore/${fileName}`);

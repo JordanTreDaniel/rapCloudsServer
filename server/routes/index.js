@@ -53,6 +53,13 @@ async function search(req, res, next) {
 	}
 }
 
+const fetchYtInfo = async (song) => {
+	const watchUrl = ((song.media || []).find((mediaInfo) => mediaInfo.provider === 'youtube') || {}).url;
+	if (!watchUrl) return { problem: "Couldn't find youtube media info on song." };
+	const res = await axios({ method: 'get', url: `https://www.youtube.com/oembed?url=${watchUrl}&format=json` });
+	return res;
+};
+
 async function getSongDetails(req, res, next) {
 	const { params, headers } = req;
 	const { songId } = params;
@@ -63,7 +70,7 @@ async function getSongDetails(req, res, next) {
 		// made a mistake with the line above and this helped me out:
 		//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
 	}
-	try {            
+	try {
 		const { data } = await axios({
 			method: 'get',
 			url: `https://api.genius.com/songs/${songId}`,
@@ -74,9 +81,11 @@ async function getSongDetails(req, res, next) {
 			},
 		});
 		const { meta, response } = data;
-		const { status } = meta; 
+		const { status } = meta;
 		const { song } = response;
-		let mongooseSong = await Song.findOne({ id: songId }).exec()
+		const { data: ytData, error } = await fetchYtInfo(song);
+		if (!error) song.ytData = ytData;
+		let mongooseSong = await Song.findOne({ id: songId }).exec();
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
 			await mongooseSong.save();
@@ -96,7 +105,9 @@ async function getSongLyrics(req, res, next) {
 		res.status(400).json({ status: 400, statusText: 'Path to page with lyrics, and song id are required.' });
 	}
 	try {
-		let tries = 1, lyrics = "", lyricStatus;
+		let tries = 1,
+			lyrics = '',
+			lyricStatus;
 		while (tries <= 3 && !lyrics.length) {
 			const { status: _lyricStatus, data: lyricData } = await axios({
 				method: 'get',
@@ -110,9 +121,9 @@ async function getSongLyrics(req, res, next) {
 					lyricsPath: songPath,
 				},
 			});
-			lyrics = lyricData.lyrics || "";
+			lyrics = lyricData.lyrics || '';
 			lyricStatus = _lyricStatus;
-			tries++
+			tries++;
 		}
 		let mongooseSong = await Song.findOne({ id: songId }, (err, foundInstance) => {
 			return foundInstance;
@@ -172,6 +183,31 @@ async function makeWordCloud(req, res, next) {
 	}
 }
 
+const saveSongs = async (songs) => {
+	for (var song of songs) {
+		const { id: songId } = song;
+		let mongoSong = await Song.findOne({ id: songId }).exec();
+		mongoSong = mongoSong ? Object.assign(mongoSong, song) : new Song(song);
+		await mongoSong.save();
+	}
+};
+
+const apiFetchArtistSongs = async (artistId, accessToken, nextPage = 1) => {
+	const { data: artistSongsData } = await axios({
+		method: 'get',
+		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${20}&page=${nextPage}&sort=${'popularity'}`,
+		headers: {
+			accept: 'application/json',
+			// host: "api.genius.com",
+			authorization: `Bearer ${accessToken}`,
+		},
+	});
+	const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
+	const { songs: artistSongs, next_page } = songsDataResponse;
+	nextPage = next_page || null;
+	return { artistSongs, nextPage };
+};
+
 async function getArtistDetails(req, res, next) {
 	const { params, headers } = req;
 	const { artistId } = params;
@@ -198,20 +234,9 @@ async function getArtistDetails(req, res, next) {
 		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
 		artist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
 		await artist.save();
-		const { data: artistSongsData } = await axios({
-			method: 'get',
-			url: `https://api.genius.com/artists/${artistId}/songs`,
-			headers: {
-				accept: 'application/json',
-				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`,
-			},
-		});
-		const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
-		const { songs, next_page } = songsDataResponse; //next_page indicates more songs
-		//TO-DO: Save both the artist & the songs!
-		artist.songs = songs;
-		res.status(status).json({ artist });
+		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken);
+		res.status(status).json({ artist, songs, nextPage });
+		saveSongs(songs);
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
@@ -242,6 +267,7 @@ async function getMasks(req, res, next) {
 					name: mask.name,
 					id: mask._id,
 					base64Img: mask.img.data.toString('base64'),
+					userId: mask.userId,
 				})),
 			});
 		});
@@ -256,7 +282,7 @@ async function addMask(req, res, next) {
 	try {
 		let mask = new Mask({
 			userId: newMask.userId,
-			name: newMask.userId,
+			name: newMask.name,
 			img: { data: Buffer.from(newMask.base64Img, 'base64'), contentType: newMask.type },
 		});
 		mask = await mask.save();
@@ -265,8 +291,22 @@ async function addMask(req, res, next) {
 			mask: {
 				name: mask.name,
 				id: mask._id,
-				base64Img: mask.img.data.toString('base64'),
+				base64Img: newMask.base64Img,
+				userId: newMask.userId,
 			},
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+async function deleteMask(req, res, next) {
+	const { body } = req;
+	const { maskId } = body;
+	try {
+		await Mask.findOneAndDelete({ _id: maskId }).exec();
+		res.status(200).json({
+			message: 'Deleted Successfully.',
+			maskId,
 		});
 	} catch (error) {
 		res.status(500).json(error);
@@ -291,5 +331,6 @@ router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks/:u?', getMasks);
 router.post('/addMask', addMask);
+router.post('/deleteMask', deleteMask);
 router.get('/seed', seed);
 export default router;
