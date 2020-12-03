@@ -4,7 +4,7 @@ import Song from '../db/models/Song';
 import Mask from '../db/models/Mask';
 import Artist from '../db/models/Artist';
 import seedDB from '../db/seed';
-
+import cloudinary from 'cloudinary';
 const router = express.Router();
 
 async function search(req, res, next) {
@@ -278,7 +278,7 @@ async function addMask(req, res, next) {
 			info: newMask.cloudinaryInfo,
 		});
 		mask = await mask.save();
-		res.status(200).json({ ...mask.toObject(), id: mask._id });
+		res.status(200).json({ mask: { ...mask.toObject(), id: mask._id } });
 	} catch (error) {
 		res.status(500).json(error);
 	}
@@ -286,9 +286,10 @@ async function addMask(req, res, next) {
 
 async function deleteMask(req, res, next) {
 	const { body } = req;
-	const { maskId } = body;
+	const { maskId, public_id } = body;
 	try {
 		await Mask.findOneAndDelete({ _id: maskId }).exec();
+		await cloudinary.v2.uploader.destroy(public_id);
 		res.status(200).json({
 			message: 'Deleted Successfully.',
 			maskId,
