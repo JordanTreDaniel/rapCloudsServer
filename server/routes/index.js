@@ -384,7 +384,6 @@ router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/views', views);
 router.post('/generateCloud', generateCloud);
 router.post('/getSongLyrics', getSongLyrics);
-router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks/:userId?', getMasks);
 router.get('/getClouds/:userId?', getClouds);
 router.post('/addMask', addMask);
