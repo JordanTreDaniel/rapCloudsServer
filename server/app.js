@@ -13,13 +13,18 @@ import session from 'express-session';
 import dotenv from 'dotenv';
 import passportInit from './passportInit';
 import authRouter from './routes/auth';
+import cloudinary from 'cloudinary';
+
 const mongoose = require('mongoose');
 const MongoStore = require('connect-mongo')(session);
 const app = express();
-
 //env variables
 dotenv.config();
-
+cloudinary.v2.config({
+	cloud_name: 'rap-clouds',
+	api_key: process.env.CLOUDINARY_KEY,
+	api_secret: process.env.CLOUDINARY_SECRET,
+});
 const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.rapclouds.com';
 // Accept requests from the client
 app.use(
@@ -29,7 +34,9 @@ app.use(
 );
 
 mongoose.connect(
-	`mongodb+srv://myself:${process.env.DB_PASSWORD}@cluster0-xlyk2.mongodb.net/${process.env.NODE_ENV === "development" ? 'dev' : 'prod'}?retryWrites=true&w=majority`,
+	`mongodb+srv://myself:${process.env.DB_PASSWORD}@cluster0-xlyk2.mongodb.net/${process.env.NODE_ENV === 'development'
+		? 'dev'
+		: 'prod'}?retryWrites=true&w=majority`,
 	{ useNewUrlParser: true, useUnifiedTopology: true },
 );
 mongoose.Promise = global.Promise;
