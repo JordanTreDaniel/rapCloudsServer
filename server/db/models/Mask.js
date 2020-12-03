@@ -1,9 +1,9 @@
-import mongoose from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
 const MaskSchema = new mongoose.Schema({
 	userId: String,
 	name: String,
-	img: { data: Buffer, contentType: String },
+	info: Schema.Types.Mixed,
 });
 
 export default mongoose.model('Mask', MaskSchema);

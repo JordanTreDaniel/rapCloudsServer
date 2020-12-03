@@ -262,14 +262,7 @@ async function getMasks(req, res, next) {
 	const { u = 'default' } = params;
 	try {
 		Mask.find({ userId: { $in: [ undefined, u ] } }, function(err, masks) {
-			res.status(200).json({
-				masks: masks.map((mask) => ({
-					name: mask.name,
-					id: mask._id,
-					base64Img: mask.img.data.toString('base64'),
-					userId: mask.userId,
-				})),
-			});
+			res.status(200).json({ masks: masks.map((mask) => ({ ...mask.toObject(), id: mask._id })) });
 		});
 	} catch (error) {
 		res.status(500).json(error);
@@ -282,23 +275,15 @@ async function addMask(req, res, next) {
 	try {
 		let mask = new Mask({
 			userId: newMask.userId,
-			name: newMask.name,
-			img: { data: Buffer.from(newMask.base64Img, 'base64'), contentType: newMask.type },
+			info: newMask.cloudinaryInfo,
 		});
 		mask = await mask.save();
-		console.log('mask', mask);
-		res.status(200).json({
-			mask: {
-				name: mask.name,
-				id: mask._id,
-				base64Img: newMask.base64Img,
-				userId: newMask.userId,
-			},
-		});
+		res.status(200).json({ ...mask.toObject(), id: mask._id });
 	} catch (error) {
 		res.status(500).json(error);
 	}
 }
+
 async function deleteMask(req, res, next) {
 	const { body } = req;
 	const { maskId } = body;
