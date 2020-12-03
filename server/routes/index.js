@@ -138,8 +138,7 @@ async function getSongLyrics(req, res, next) {
 		res.status(lyricStatus).json({ lyrics });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
-		const { status, statusText } = err.response;
-		res.status(status).json({ status, statusText });
+		res.status(500).json({ err });
 	}
 }
 
@@ -296,10 +295,30 @@ const views = (req, res, next) => {
 
 async function getMasks(req, res, next) {
 	const { params } = req;
-	const { u = 'default' } = params;
+	const { userId = 'default' } = params;
 	try {
-		Mask.find({ userId: { $in: [ undefined, u ] } }, function(err, masks) {
+		Mask.find({ userId: { $in: [ undefined, userId ] } }, function(err, masks) {
+			if (err) {
+				res.status(500).json({ message: 'Something went wrong fetching resources from DB', err });
+			}
+			//TO-DO: Modify query to pull public assets as well
 			res.status(200).json({ masks: masks.map((mask) => ({ ...mask.toObject(), id: mask._id })) });
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
+async function getClouds(req, res, next) {
+	const { params } = req;
+	const { userId = 'default' } = params;
+	try {
+		RapCloud.find({ userId: { $in: [ undefined, userId ] } }, function(err, clouds) {
+			if (err) {
+				res.status(500).json({ message: 'Something went wrong fetching resources from DB', err });
+			}
+			//TO-DO: Modify query to pull public assets as well
+			res.status(200).json({ clouds: clouds.map((cloud) => ({ ...cloud.toObject(), id: cloud._id })) });
 		});
 	} catch (error) {
 		res.status(500).json(error);
@@ -352,7 +371,8 @@ router.get('/views', views);
 router.post('/generateCloud', generateCloud);
 router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
-router.get('/masks/:u?', getMasks);
+router.get('/masks/:userId?', getMasks);
+router.get('/getClouds/:userId?', getClouds);
 router.post('/addMask', addMask);
 router.post('/deleteMask', deleteMask);
 router.get('/seed', seed);
