@@ -189,7 +189,6 @@ async function generateCloud(req, res, next) {
 					console.log('Something went wrong while trying to save your RapCloud to Cloudinary.', error);
 					return error;
 				}
-				console.log('cloudinaryResult', { result, error });
 				return result;
 			},
 		);
@@ -355,6 +354,21 @@ async function deleteMask(req, res, next) {
 	}
 }
 
+async function deleteCloud(req, res, next) {
+	const { body } = req;
+	const { cloudId, public_id } = body;
+	try {
+		await RapCloud.findOneAndDelete({ _id: cloudId }).exec();
+		await cloudinary.v2.uploader.destroy(public_id);
+		res.status(200).json({
+			message: 'Deleted Successfully.',
+			cloudId,
+		});
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
 async function seed(req, res, next) {
 	try {
 		await seedDB();
@@ -375,5 +389,6 @@ router.get('/masks/:userId?', getMasks);
 router.get('/getClouds/:userId?', getClouds);
 router.post('/addMask', addMask);
 router.post('/deleteMask', deleteMask);
+router.post('/deleteCloud', deleteCloud);
 router.get('/seed', seed);
 export default router;
