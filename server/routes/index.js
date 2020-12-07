@@ -62,6 +62,17 @@ const fetchYtInfo = async (song) => {
 	return res;
 };
 
+const saveArtistsFromSong = async (song) => {
+	const { primary_artist, featured_artists = [], producer_artists = [] } = song;
+	const artists = [ primary_artist, ...featured_artists, ...producer_artists ];
+	for (var artist of artists) {
+		const { id: artistId } = artist;
+		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
+		mongoArtist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
+		await mongoArtist.save();
+	}
+};
+
 async function getSongDetails(req, res, next) {
 	const { params, headers } = req;
 	const { songId } = params;
@@ -85,6 +96,7 @@ async function getSongDetails(req, res, next) {
 		const { meta, response } = data;
 		const { status } = meta;
 		let { song } = response;
+		await saveArtistsFromSong(song);
 		const { data: ytData, error } = await fetchYtInfo(song);
 		if (!error) song.ytData = ytData;
 		let mongooseSong = await Song.findOne({ id: songId }).exec();
