@@ -62,6 +62,17 @@ const fetchYtInfo = async (song) => {
 	return res;
 };
 
+const saveArtistsFromSong = async (song) => {
+	const { primary_artist, featured_artists = [], producer_artists = [] } = song;
+	const artists = [ primary_artist, ...featured_artists, ...producer_artists ];
+	for (var artist of artists) {
+		const { id: artistId } = artist;
+		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
+		mongoArtist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
+		await mongoArtist.save();
+	}
+};
+
 async function getSongDetails(req, res, next) {
 	const { params, headers } = req;
 	const { songId } = params;
@@ -84,19 +95,24 @@ async function getSongDetails(req, res, next) {
 		});
 		const { meta, response } = data;
 		const { status } = meta;
-		const { song } = response;
+		let { song } = response;
+		await saveArtistsFromSong(song);
 		const { data: ytData, error } = await fetchYtInfo(song);
 		if (!error) song.ytData = ytData;
 		let mongooseSong = await Song.findOne({ id: songId }).exec();
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
 			await mongooseSong.save();
+			song = mongooseSong;
+		} else {
+			console.log('Details fetched for previously unknown song. Going to save it.');
+			song = new Song(song);
+			await song.save();
 		}
-		res.status(status).json({ song });
+		res.status(status).json({ song: song.toObject() });
 	} catch (err) {
-		console.log('SOMETHING WENT WRONG', err);
-		const { status, statusText } = err.response;
-		res.status(status).json({ status, statusText });
+		console.log('SOMETHING WENT WRONG in getSongDetails', err);
+		res.status(status).json({ err });
 	}
 }
 
