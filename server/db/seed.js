@@ -30,7 +30,7 @@ const seedDB = async () => {
 		}
 		const cloudinaryResult = await cloudinary.v2.uploader.upload(
 			`ignore/${fileName}`,
-			{ folder: '/publicMasks' },
+			{ folder: process.env.NODE_ENV === 'development' ? '/publicMasksDev' : '/publicMasks' },
 			(error, result) => {
 				if (error) {
 					console.log('Something went wrong while trying to save your Mask to Cloudinary.', error);

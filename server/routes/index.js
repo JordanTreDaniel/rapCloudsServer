@@ -199,7 +199,7 @@ async function generateCloud(req, res, next) {
 		const cloudinaryResult = await cloudinary.v2.uploader.upload(
 			'tempCloud.png',
 			// `data:image/png;base64, ${encodedCloud}`, //TO-DO: Fix problem with using base64. Could be faster.
-			{ folder: '/userMadeClouds' },
+			{ folder: process.env.NODE_ENV === 'development' ? '/userMadeCloudsDev' : '/userMadeClouds' },
 			(error, result) => {
 				if (error) {
 					console.log('Something went wrong while trying to save your RapCloud to Cloudinary.', error);
