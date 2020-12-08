@@ -158,6 +158,19 @@ async function getSongLyrics(req, res, next) {
 	}
 }
 
+async function base64ToFile(fileName, data) {
+	return new Promise((resolve, reject) => {
+		fs.writeFile(fileName, data, 'base64', function(err) {
+			if (err) {
+				console.log('Something went wrong with fs.writeFile', err);
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
+	});
+}
+
 async function generateCloud(req, res, next) {
 	const { headers, body } = req;
 	const {
@@ -188,17 +201,10 @@ async function generateCloud(req, res, next) {
 			},
 		});
 		const encodedCloud = data.encodedCloud.replace(/(\r\n|\n|\r)/gm, '');
-		await fs.writeFile('tempCloud.png', encodedCloud, 'base64', function(err) {
-			if (err) {
-				console.log('Something went wrong with fs.writeFile', err);
-				res
-					.status(500)
-					.json({ err, message: 'Something went wrong while trying to save the new cloud to the db & cdn' });
-			}
-		});
+		await base64ToFile('tempCloud.png', encodedCloud);
 		const cloudinaryResult = await cloudinary.v2.uploader.upload(
 			'tempCloud.png',
-			// `data:image/png;base64, ${encodedCloud}`, //TO-DO: Fix problem with using base64. Could be faster.
+			// `data:image/png;base64, ${encodedCloud}`, //TO-DO: Fix problem with using base64. Could be faster than using temp.png.
 			{ folder: process.env.NODE_ENV === 'development' ? '/userMadeCloudsDev' : '/userMadeClouds' },
 			(error, result) => {
 				if (error) {
@@ -210,9 +216,9 @@ async function generateCloud(req, res, next) {
 		);
 		fs.unlink('tempCloud.png', (err) => {
 			if (err) {
-				console.log('Something went wrong while removing tempCloud.png');
+				console.log('Something went wrong while removing tempCloud.png', err);
 			} else {
-				console.log('Removed tempCloud.png', err);
+				console.log('Removed tempCloud.png');
 			}
 		});
 		const rapCloud = new RapCloud({
@@ -225,10 +231,10 @@ async function generateCloud(req, res, next) {
 			inspirationType,
 			lyricString,
 		});
-		rapCloud.save();
+		await rapCloud.save();
 		res.status(200).json({ data: { rapCloud: { ...rapCloud.toObject(), id: rapCloud._id } } });
 	} catch (err) {
-		console.log('SOMETHING WENT WRONG', { err });
+		console.log('SOMETHING WENT WRONG in generateCloud', { err });
 		const { status, statusText, data } = err.response;
 		res.status(status).json({ status, statusText, data });
 	}
