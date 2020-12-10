@@ -213,7 +213,7 @@ async function triggerCloudGeneration(req, res, next) {
 			},
 		});
 		const { message } = data;
-		res.status(200).json({ cloud: newCloud.toObject(), message });
+		res.status(200).json({ cloud: { ...newCloud.toObject(), id: newCloud._id }, message });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in triggerCloudGeneration', { err });
 		res.status(500).json({ err });
@@ -231,7 +231,7 @@ async function handleNewCloud(req, res, next) {
 		);
 		await rapCloud.save();
 		const io = req.app.get('io');
-		io.in(socketId).emit('RapCloudFinished', rapCloud.toObject());
+		io.in(socketId).emit('RapCloudFinished', { ...rapCloud.toObject(), id: rapCloud._id });
 		res.status(200).json({ message: 'Cloud is saved and sent back to client.' });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in handleNewCloud', { err });
