@@ -158,8 +158,22 @@ async function getSongLyrics(req, res, next) {
 	}
 }
 
-async function generateCloud(req, res, next) {
-	const { headers, body } = req;
+async function base64ToFile(fileName, data) {
+	return new Promise((resolve, reject) => {
+		fs.writeFile(fileName, data, 'base64', function(err) {
+			if (err) {
+				console.log('Something went wrong with fs.writeFile', err);
+				reject(err);
+			} else {
+				resolve();
+			}
+		});
+	});
+}
+
+async function triggerCloudGeneration(req, res, next) {
+	const { headers, body, params } = req;
+	const { socketId } = params;
 	const {
 		lyricString,
 		settings,
@@ -172,8 +186,17 @@ async function generateCloud(req, res, next) {
 	const { maskId } = settings;
 	const mask = maskId ? await Mask.findById(maskId).exec() : null;
 	try {
+		const newCloud = new RapCloud({
+			artistIds,
+			description,
+			settings,
+			songIds,
+			userId,
+			inspirationType,
+			lyricString,
+		});
+		await newCloud.save();
 		const isLocalBuild = headers.host.match('localhost');
-
 		const { data, status, error } = await axios({
 			method: 'post',
 			url: isLocalBuild ? 'http://localhost:5000' : `https://o049r3fygh.execute-api.us-east-1.amazonaws.com/dev`,
@@ -185,52 +208,34 @@ async function generateCloud(req, res, next) {
 				lyricString,
 				maskUrl: mask && mask.info.url,
 				cloudSettings: settings,
+				socketId,
+				cloudId: newCloud._id,
 			},
 		});
-		const encodedCloud = data.encodedCloud.replace(/(\r\n|\n|\r)/gm, '');
-		await fs.writeFile('tempCloud.png', encodedCloud, 'base64', function(err) {
-			if (err) {
-				console.log('Something went wrong with fs.writeFile', err);
-				res
-					.status(500)
-					.json({ err, message: 'Something went wrong while trying to save the new cloud to the db & cdn' });
-			}
-		});
-		const cloudinaryResult = await cloudinary.v2.uploader.upload(
-			'tempCloud.png',
-			// `data:image/png;base64, ${encodedCloud}`, //TO-DO: Fix problem with using base64. Could be faster.
-			{ folder: process.env.NODE_ENV === 'development' ? '/userMadeCloudsDev' : '/userMadeClouds' },
-			(error, result) => {
-				if (error) {
-					console.log('Something went wrong while trying to save your RapCloud to Cloudinary.', error);
-					return error;
-				}
-				return result;
-			},
-		);
-		fs.unlink('tempCloud.png', (err) => {
-			if (err) {
-				console.log('Something went wrong while removing tempCloud.png');
-			} else {
-				console.log('Removed tempCloud.png', err);
-			}
-		});
-		const rapCloud = new RapCloud({
-			info: cloudinaryResult,
-			artistIds,
-			description,
-			settings,
-			songIds,
-			userId,
-			inspirationType,
-			lyricString,
-		});
-		rapCloud.save();
-		res.status(200).json({ data: { rapCloud: { ...rapCloud.toObject(), id: rapCloud._id } } });
+		const { message } = data;
+		res.status(200).json({ cloud: { ...newCloud.toObject(), id: newCloud._id }, message });
 	} catch (err) {
-		console.log('SOMETHING WENT WRONG', { err });
-		const { status, statusText, data } = err.response;
-		res.status(status).json({ status, statusText, data });
+		console.log('SOMETHING WENT WRONG in triggerCloudGeneration', { err });
+		res.status(500).json({ err });
+	}
+}
+
+async function handleNewCloud(req, res, next) {
+	const { headers, body, data } = req;
+	const { socketId, cloudId, cloudInfo } = body;
+	try {
+		const rapCloud = await RapCloud.findOneAndUpdate(
+			{ _id: cloudId },
+			{ info: cloudInfo },
+			{ new: true, useFindAndModify: false },
+		);
+		await rapCloud.save();
+		const io = req.app.get('io');
+		io.in(socketId).emit('RapCloudFinished', { ...rapCloud.toObject(), id: rapCloud._id });
+		res.status(200).json({ message: 'Cloud is saved and sent back to client.' });
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG in handleNewCloud', { err });
+		res.status(500).json({ err });
 	}
 }
 
@@ -385,6 +390,72 @@ async function deleteCloud(req, res, next) {
 	}
 }
 
+async function deleteAllClouds(req, res, next) {
+	try {
+		const rapClouds = await RapCloud.find({}).exec();
+		const deletedClouds = [];
+		for (const rapCloud of rapClouds) {
+			const { _id, info = {} } = rapCloud;
+			const { public_id } = info;
+			if (public_id) {
+				await cloudinary.v2.uploader.destroy(public_id);
+			} else {
+				console.log('Found a rapCloud with no public_id', rapCloud);
+			}
+			await RapCloud.findByIdAndDelete(_id);
+			deletedClouds.push(_id);
+		}
+		res.status(200).json({
+			message: 'Deleted Successfully.',
+			deletedClouds,
+		});
+	} catch (error) {
+		console.log('Something went wrong in deleteAllClouds', error);
+		res.status(500).json(error);
+	}
+}
+
+async function pruneCloudinary(req, res, next) {
+	try {
+		let cloudinaryResult,
+			next_cursor,
+			resources = [];
+		const cloudinaryCallOptions = { max_results: 500 };
+		do {
+			await cloudinary.v2.api.resources(cloudinaryCallOptions, function(error, result) {
+				cloudinaryResult = result;
+				next_cursor = result.next_cursor;
+				resources.push(...result.resources);
+			});
+		} while (next_cursor);
+
+		const deletedResources = [];
+		for (const resource of resources) {
+			const { public_id } = resource;
+			const rapClouds = await RapCloud.find({ 'info.public_id': public_id });
+			const masks = await Mask.find({ 'info.public_id': public_id });
+			// console.log({ rapClouds, masks });
+			const conditions = [ !rapClouds.length, !masks.length ];
+			const matchesDev = public_id.toLowerCase().match('dev');
+			conditions.push(process.env.NODE_ENV === 'development' ? matchesDev : !matchesDev);
+			if (conditions.every((c) => c)) {
+				// console.log('Found a resource with no matching rapCloud or mask', resource);
+				await cloudinary.v2.uploader.destroy(public_id);
+				deletedResources.push(public_id);
+			}
+		}
+		res.status(200).json({
+			message: 'Pruned Successfully.',
+			resources,
+			deletedResources,
+			cloudinaryResult,
+		});
+	} catch (error) {
+		console.log('Something went wrong in pruneCloudinary', error);
+		res.status(500).json(error);
+	}
+}
+
 async function seed(req, res, next) {
 	try {
 		await seedDB();
@@ -394,11 +465,25 @@ async function seed(req, res, next) {
 	}
 }
 
+async function verifyAdmin(req, res, next) {
+	try {
+		const { params } = req;
+		const { adminPassword } = params;
+		if (adminPassword !== process.env.ADMIN_PASSWORD) {
+			res.status(403).json({ message: 'Admin password needed' });
+			return;
+		}
+		next();
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
-router.get('/views', views);
-router.post('/generateCloud', generateCloud);
+router.post('/triggerCloudGeneration/:socketId', triggerCloudGeneration);
+router.post('/newCloud/', handleNewCloud);
 router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks/:userId?', getMasks);
@@ -406,5 +491,10 @@ router.get('/getClouds/:userId?', getClouds);
 router.post('/addMask', addMask);
 router.post('/deleteMask', deleteMask);
 router.post('/deleteCloud', deleteCloud);
-router.get('/seed', seed);
+//Admin Endpoints
+router.get('/views/:adminPassword', verifyAdmin, views);
+router.get('/deleteAllClouds/:adminPassword', verifyAdmin, deleteAllClouds);
+router.get('/pruneCloudinary/:adminPassword', verifyAdmin, pruneCloudinary);
+router.get('/seed/:adminPassword', verifyAdmin, seed);
+
 export default router;
