@@ -390,6 +390,68 @@ async function deleteCloud(req, res, next) {
 	}
 }
 
+async function deleteAllClouds(req, res, next) {
+	try {
+		const rapClouds = await RapCloud.find({}).exec();
+		const deletedClouds = [];
+		for (const rapCloud of rapClouds) {
+			const { _id, info = {} } = rapCloud;
+			const { public_id } = info;
+			if (public_id) {
+				await cloudinary.v2.uploader.destroy(public_id);
+			} else {
+				console.log('Found a rapCloud with no public_id', rapCloud);
+			}
+			await RapCloud.findByIdAndDelete(_id);
+			deletedClouds.push(_id);
+		}
+		res.status(200).json({
+			message: 'Deleted Successfully.',
+			deletedClouds,
+		});
+	} catch (error) {
+		console.log('Something went wrong in deleteAllClouds', error);
+		res.status(500).json(error);
+	}
+}
+
+async function pruneCloudinary(req, res, next) {
+	try {
+		let cloudinaryResult,
+			next_cursor,
+			resources = [];
+		const cloudinaryCallOptions = { max_results: 500 };
+		do {
+			await cloudinary.v2.api.resources(cloudinaryCallOptions, function(error, result) {
+				cloudinaryResult = result;
+				next_cursor = result.next_cursor;
+				resources.push(...result.resources);
+			});
+		} while (next_cursor);
+
+		const deletedResources = [];
+		for (const resource of resources) {
+			const { public_id } = resource;
+			const rapCloud = await RapCloud.find({ 'info.public_id': public_id });
+			const mask = await Mask.find({ 'info.public_id': public_id });
+			if (!rapCloud && !mask) {
+				console.log('Found a resource with no matching rapCloud or mask', resource);
+				await cloudinary.v2.uploader.destroy(public_id);
+				deletedResources.push(public_id);
+			}
+		}
+		res.status(200).json({
+			message: 'Pruned Successfully.',
+			resources,
+			deletedResources,
+			cloudinaryResult,
+		});
+	} catch (error) {
+		console.log('Something went wrong in pruneCloudinary', error);
+		res.status(500).json(error);
+	}
+}
+
 async function seed(req, res, next) {
 	try {
 		await seedDB();
@@ -402,7 +464,6 @@ async function seed(req, res, next) {
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
-router.get('/views', views);
 router.post('/triggerCloudGeneration/:socketId', triggerCloudGeneration);
 router.post('/newCloud/', handleNewCloud);
 router.post('/getSongLyrics', getSongLyrics);
@@ -412,5 +473,10 @@ router.get('/getClouds/:userId?', getClouds);
 router.post('/addMask', addMask);
 router.post('/deleteMask', deleteMask);
 router.post('/deleteCloud', deleteCloud);
-router.get('/seed', seed);
+if (process.env.NODE_ENV === 'development') {
+	router.get('/views', views);
+	router.get('/deleteAllClouds', deleteAllClouds);
+	router.get('/pruneCloudinary', pruneCloudinary);
+	router.get('/seed', seed);
+}
 export default router;
