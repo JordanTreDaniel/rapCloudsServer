@@ -432,10 +432,14 @@ async function pruneCloudinary(req, res, next) {
 		const deletedResources = [];
 		for (const resource of resources) {
 			const { public_id } = resource;
-			const rapCloud = await RapCloud.find({ 'info.public_id': public_id });
-			const mask = await Mask.find({ 'info.public_id': public_id });
-			if (!rapCloud && !mask) {
-				console.log('Found a resource with no matching rapCloud or mask', resource);
+			const rapClouds = await RapCloud.find({ 'info.public_id': public_id });
+			const masks = await Mask.find({ 'info.public_id': public_id });
+			// console.log({ rapClouds, masks });
+			const conditions = [ !rapClouds.length, !masks.length ];
+			const matchesDev = public_id.toLowerCase().match('dev');
+			conditions.push(process.env.NODE_ENV === 'development' ? matchesDev : !matchesDev);
+			if (conditions.every((c) => c)) {
+				// console.log('Found a resource with no matching rapCloud or mask', resource);
 				await cloudinary.v2.uploader.destroy(public_id);
 				deletedResources.push(public_id);
 			}
@@ -461,6 +465,20 @@ async function seed(req, res, next) {
 	}
 }
 
+async function verifyAdmin(req, res, next) {
+	try {
+		const { params } = req;
+		const { adminPassword } = params;
+		if (adminPassword !== process.env.ADMIN_PASSWORD) {
+			res.status(403).json({ message: 'Admin password needed' });
+			return;
+		}
+		next();
+	} catch (error) {
+		res.status(500).json(error);
+	}
+}
+
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
@@ -473,10 +491,10 @@ router.get('/getClouds/:userId?', getClouds);
 router.post('/addMask', addMask);
 router.post('/deleteMask', deleteMask);
 router.post('/deleteCloud', deleteCloud);
-if (process.env.NODE_ENV === 'development') {
-	router.get('/views', views);
-	router.get('/deleteAllClouds', deleteAllClouds);
-	router.get('/pruneCloudinary', pruneCloudinary);
-	router.get('/seed', seed);
-}
+//Admin Endpoints
+router.get('/views/:adminPassword', verifyAdmin, views);
+router.get('/deleteAllClouds/:adminPassword', verifyAdmin, deleteAllClouds);
+router.get('/pruneCloudinary/:adminPassword', verifyAdmin, pruneCloudinary);
+router.get('/seed/:adminPassword', verifyAdmin, seed);
+
 export default router;
