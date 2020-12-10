@@ -171,8 +171,9 @@ async function base64ToFile(fileName, data) {
 	});
 }
 
-async function generateCloud(req, res, next) {
-	const { headers, body } = req;
+async function triggerCloudGeneration(req, res, next) {
+	const { headers, body, params } = req;
+	const { socketId } = params;
 	const {
 		lyricString,
 		settings,
@@ -185,8 +186,17 @@ async function generateCloud(req, res, next) {
 	const { maskId } = settings;
 	const mask = maskId ? await Mask.findById(maskId).exec() : null;
 	try {
+		const newCloud = new RapCloud({
+			artistIds,
+			description,
+			settings,
+			songIds,
+			userId,
+			inspirationType,
+			lyricString,
+		});
+		await newCloud.save();
 		const isLocalBuild = headers.host.match('localhost');
-
 		const { data, status, error } = await axios({
 			method: 'post',
 			url: isLocalBuild ? 'http://localhost:5000' : `https://o049r3fygh.execute-api.us-east-1.amazonaws.com/dev`,
@@ -198,45 +208,34 @@ async function generateCloud(req, res, next) {
 				lyricString,
 				maskUrl: mask && mask.info.url,
 				cloudSettings: settings,
+				socketId,
+				cloudId: newCloud._id,
 			},
 		});
-		const encodedCloud = data.encodedCloud.replace(/(\r\n|\n|\r)/gm, '');
-		await base64ToFile('tempCloud.png', encodedCloud);
-		const cloudinaryResult = await cloudinary.v2.uploader.upload(
-			'tempCloud.png',
-			// `data:image/png;base64, ${encodedCloud}`, //TO-DO: Fix problem with using base64. Could be faster than using temp.png.
-			{ folder: process.env.NODE_ENV === 'development' ? '/userMadeCloudsDev' : '/userMadeClouds' },
-			(error, result) => {
-				if (error) {
-					console.log('Something went wrong while trying to save your RapCloud to Cloudinary.', error);
-					return error;
-				}
-				return result;
-			},
-		);
-		fs.unlink('tempCloud.png', (err) => {
-			if (err) {
-				console.log('Something went wrong while removing tempCloud.png', err);
-			} else {
-				console.log('Removed tempCloud.png');
-			}
-		});
-		const rapCloud = new RapCloud({
-			info: cloudinaryResult,
-			artistIds,
-			description,
-			settings,
-			songIds,
-			userId,
-			inspirationType,
-			lyricString,
-		});
-		await rapCloud.save();
-		res.status(200).json({ data: { rapCloud: { ...rapCloud.toObject(), id: rapCloud._id } } });
+		const { message } = data;
+		res.status(200).json({ cloud: newCloud.toObject(), message });
 	} catch (err) {
-		console.log('SOMETHING WENT WRONG in generateCloud', { err });
-		const { status, statusText, data } = err.response;
-		res.status(status).json({ status, statusText, data });
+		console.log('SOMETHING WENT WRONG in triggerCloudGeneration', { err });
+		res.status(500).json({ err });
+	}
+}
+
+async function handleNewCloud(req, res, next) {
+	const { headers, body, data } = req;
+	const { socketId, cloudId, cloudInfo } = body;
+	try {
+		const rapCloud = await RapCloud.findOneAndUpdate(
+			{ _id: cloudId },
+			{ info: cloudInfo },
+			{ new: true, useFindAndModify: false },
+		);
+		await rapCloud.save();
+		const io = req.app.get('io');
+		io.in(socketId).emit('RapCloudFinished', rapCloud.toObject());
+		res.status(200).json({ message: 'Cloud is saved and sent back to client.' });
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG in handleNewCloud', { err });
+		res.status(500).json({ err });
 	}
 }
 
@@ -404,7 +403,8 @@ router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/views', views);
-router.post('/generateCloud', generateCloud);
+router.post('/triggerCloudGeneration/:socketId', triggerCloudGeneration);
+router.post('/newCloud/', handleNewCloud);
 router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks/:userId?', getMasks);
