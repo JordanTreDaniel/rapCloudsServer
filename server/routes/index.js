@@ -199,7 +199,9 @@ async function triggerCloudGeneration(req, res, next) {
 		const isLocalBuild = headers.host.match('localhost');
 		const { data, status, error } = await axios({
 			method: 'post',
-			url: isLocalBuild ? 'http://localhost:5000' : `https://o049r3fygh.execute-api.us-east-1.amazonaws.com/dev`,
+			url: isLocalBuild
+				? 'http://localhost:5000'
+				: `https://hfkrdv49ve.execute-api.us-east-1.amazonaws.com/default/triggerCloudGeneration`,
 			headers: {
 				'Content-Type': 'application/json',
 				'Access-Control-Allow-Origin': '*',
