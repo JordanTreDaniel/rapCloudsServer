@@ -199,9 +199,7 @@ async function triggerCloudGeneration(req, res, next) {
 		const isLocalBuild = headers.host.match('localhost');
 		const { data, status, error } = await axios({
 			method: 'post',
-			url: isLocalBuild
-				? 'http://localhost:5000'
-				: `https://hfkrdv49ve.execute-api.us-east-1.amazonaws.com/default/triggerCloudGeneration`,
+			url: isLocalBuild ? 'http://localhost:5000' : `https://rap-clouds-generator.herokuapp.com/`,
 			headers: {
 				'Content-Type': 'application/json',
 				'Access-Control-Allow-Origin': '*',
@@ -225,6 +223,7 @@ async function triggerCloudGeneration(req, res, next) {
 async function handleNewCloud(req, res, next) {
 	const { headers, body, data } = req;
 	const { socketId, cloudId, cloudInfo } = body;
+	console.log('handleNewCloud', { socketId, cloudId, cloudInfo });
 	try {
 		const rapCloud = await RapCloud.findOneAndUpdate(
 			{ _id: cloudId },
