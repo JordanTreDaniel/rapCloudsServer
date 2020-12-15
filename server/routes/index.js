@@ -98,8 +98,6 @@ async function getSongDetails(req, res, next) {
 		let { song } = response;
 		const { data: ytData, error } = await fetchYtInfo(song);
 		if (!error) song.ytData = ytData;
-		res.status(status).json({ song: song.toObject() });
-		await saveArtistsFromSong(song);
 		let mongooseSong = await Song.findOne({ id: songId }).exec();
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
@@ -110,6 +108,8 @@ async function getSongDetails(req, res, next) {
 			song = new Song(song);
 			await song.save();
 		}
+		res.status(status).json({ song: song.toObject() });
+		await saveArtistsFromSong(song);
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in getSongDetails', err);
 		res.status(status).json({ err });
