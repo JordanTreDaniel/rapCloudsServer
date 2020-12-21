@@ -37,8 +37,15 @@ async function search(req, res, next) {
 		const { status } = meta;
 		const { hits } = response;
 		const songs = hits.map((hit) => hit.result);
+		const artists = songs.reduce((artists, song) => {
+			const { primary_artist, featured_artists = [] } = song;
+			artists[primary_artist.id] = primary_artist;
+			featured_artists.forEach((artist) => (artists[artist.id] = artist));
+			return artists;
+		}, {});
+		res.status(status).json({ songs, artists });
 		//TO-DO: Is there a way to findManyOrCreate?
-		const mongooseSongs = songs.map(async (song) => {
+		songs.forEach(async (song) => {
 			let mongooseSong = await Song.findOne({ id: song.id }, (err, foundInstance) => {
 				return foundInstance;
 			});
@@ -46,9 +53,8 @@ async function search(req, res, next) {
 				mongooseSong = new Song(song);
 				mongooseSong.save();
 			}
-			return mongooseSong;
+			await saveArtistsFromSong(song);
 		});
-		res.status(status).json({ songs });
 	} catch (err) {
 		const { status, statusText } = err.response;
 		res.status(401).json({ status, statusText });
