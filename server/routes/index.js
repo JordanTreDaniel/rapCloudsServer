@@ -196,10 +196,9 @@ async function triggerCloudGeneration(req, res, next) {
 			lyricString,
 		});
 		await newCloud.save();
-		const isLocalBuild = headers.host.match('localhost');
 		const { data, status, error } = await axios({
 			method: 'post',
-			url: isLocalBuild ? 'http://localhost:5000' : `https://rap-clouds-generator.herokuapp.com/`,
+			url: CLOUD_GEN_ENDPOINT,
 			headers: {
 				'Content-Type': 'application/json',
 				'Access-Control-Allow-Origin': '*',
