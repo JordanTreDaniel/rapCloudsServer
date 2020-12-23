@@ -74,8 +74,10 @@ const saveArtistsFromSong = async (song) => {
 	for (var artist of artists) {
 		const { id: artistId } = artist;
 		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
-		mongoArtist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
-		await mongoArtist.save();
+		if (!mongoArtist) {
+			mongoArtist = new Artist(artist);
+			await mongoArtist.save();
+		}
 	}
 };
 
