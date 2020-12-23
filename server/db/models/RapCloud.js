@@ -35,6 +35,8 @@ const RapCloudSchema = new mongoose.Schema({
 	info: Schema.Types.Mixed, //TO-DO: Make a schema for the info cloudinary gives
 	inspirationType: String,
 	lyricString: { type: String, default: "Lyric string wasn't provided upon creation." },
+	officialCloud: { type: Boolean, default: false },
+	private: { type: Boolean, default: true },
 });
 
 export default mongoose.model('RapCloud', RapCloudSchema);

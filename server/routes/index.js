@@ -107,6 +107,7 @@ async function getSongDetails(req, res, next) {
 		const { data: ytData, error } = await fetchYtInfo(song);
 		if (!error) song.ytData = ytData;
 		let mongooseSong = await Song.findOne({ id: songId }).exec();
+		let cloud = await RapCloud.findOne({ songIds: [ songId ], officialCloud: true });
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
 			await mongooseSong.save();
@@ -116,8 +117,10 @@ async function getSongDetails(req, res, next) {
 			song = new Song(song);
 			await song.save();
 		}
-		res.status(status).json({ song: song.toObject() });
-		await saveArtistsFromSong(song);
+		res
+			.status(status)
+			.json({ song: song.toObject(), cloud: cloud ? { ...cloud.toObject(), id: cloud._id } : null });
+		// await saveArtistsFromSong(song); //TO-DO: Re-instate
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in getSongDetails', err);
 		res.status(status).json({ err });
@@ -190,6 +193,7 @@ async function triggerCloudGeneration(req, res, next) {
 		songIds = [],
 		userId,
 		inspirationType = 'song, artist, or album',
+		officialCloud,
 	} = body;
 	const { maskId } = settings;
 	const mask = maskId ? await Mask.findById(maskId).exec() : null;
@@ -202,6 +206,7 @@ async function triggerCloudGeneration(req, res, next) {
 			userId,
 			inspirationType,
 			lyricString,
+			officialCloud,
 		});
 		await newCloud.save();
 		const { data, status, error } = await axios({
@@ -228,19 +233,23 @@ async function triggerCloudGeneration(req, res, next) {
 }
 
 async function handleNewCloud(req, res, next) {
-	const { headers, body, data } = req;
-	const { socketId, cloudId, cloudInfo } = body;
-	console.log('handleNewCloud', { socketId, cloudId, cloudInfo });
+	const { body } = req;
+	const { socketId, cloudId, cloudInfo, error } = body;
 	try {
-		const rapCloud = await RapCloud.findOneAndUpdate(
-			{ _id: cloudId },
-			{ info: cloudInfo },
-			{ new: true, useFindAndModify: false },
-		);
-		await rapCloud.save();
 		const io = req.app.get('io');
-		io.in(socketId).emit('RapCloudFinished', { ...rapCloud.toObject(), id: rapCloud._id });
-		res.status(200).json({ message: 'Cloud is saved and sent back to client.' });
+		if (error) {
+			io.in(socketId).emit('RapCloudError', { error, cloudId, socketId });
+			res.status(200).json({ message: 'Error received from python script & reported to React app.' });
+		} else {
+			const rapCloud = await RapCloud.findOneAndUpdate(
+				{ _id: cloudId },
+				{ info: cloudInfo },
+				{ new: true, useFindAndModify: false },
+			);
+			await rapCloud.save();
+			io.in(socketId).emit('RapCloudFinished', { ...rapCloud.toObject(), id: rapCloud._id });
+			res.status(200).json({ message: 'Cloud is saved and sent back to client.' });
+		}
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in handleNewCloud', { err });
 		res.status(500).json({ err });
@@ -388,7 +397,9 @@ async function deleteCloud(req, res, next) {
 	const { cloudId, public_id } = body;
 	try {
 		await RapCloud.findOneAndDelete({ _id: cloudId }).exec();
-		await cloudinary.v2.uploader.destroy(public_id);
+		if (public_id) {
+			await cloudinary.v2.uploader.destroy(public_id);
+		}
 		res.status(200).json({
 			message: 'Deleted Successfully.',
 			cloudId,
