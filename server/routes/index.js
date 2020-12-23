@@ -204,7 +204,7 @@ async function triggerCloudGeneration(req, res, next) {
 		await newCloud.save();
 		const { data, status, error } = await axios({
 			method: 'post',
-			url: CLOUD_GEN_ENDPOINT,
+			url: process.env.CLOUD_GEN_ENDPOINT,
 			headers: {
 				'Content-Type': 'application/json',
 				'Access-Control-Allow-Origin': '*',
