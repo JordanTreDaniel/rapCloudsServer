@@ -222,6 +222,7 @@ async function triggerCloudGeneration(req, res, next) {
 				cloudSettings: settings,
 				socketId,
 				cloudId: newCloud._id,
+				officialCloud,
 			},
 		});
 		const { message } = data;
