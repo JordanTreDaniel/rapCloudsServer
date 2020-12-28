@@ -102,12 +102,10 @@ async function getSongDetails(req, res, next) {
 			},
 		});
 		const { meta, response } = data;
-		const { status } = meta;
 		let { song } = response;
 		const { data: ytData, error } = await fetchYtInfo(song);
 		if (!error) song.ytData = ytData;
 		let mongooseSong = await Song.findOne({ id: songId }).exec();
-		let cloud = await RapCloud.findOne({ songIds: [ songId ], officialCloud: true });
 		if (mongooseSong) {
 			Object.assign(mongooseSong, song);
 			await mongooseSong.save();
@@ -117,13 +115,29 @@ async function getSongDetails(req, res, next) {
 			song = new Song(song);
 			await song.save();
 		}
-		res
-			.status(status)
-			.json({ song: song.toObject(), cloud: cloud ? { ...cloud.toObject(), id: cloud._id } : null });
+		res.status(200).json({
+			song: song.toObject(),
+		});
 		// await saveArtistsFromSong(song); //TO-DO: Re-instate
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in getSongDetails', err);
-		res.status(status).json({ err });
+		res.status(500).json({ err });
+	}
+}
+
+async function getSongClouds(req, res, next) {
+	const { params } = req;
+	const { songId, userId } = params;
+	try {
+		let officalCloud = await RapCloud.findOne({ songIds: [ songId ], officialCloud: true });
+		let userMadeClouds = await RapCloud.find({ songIds: [ songId ], userId: userId });
+		res.status(200).json({
+			officalCloud: officalCloud ? { ...officalCloud.toObject(), id: officalCloud._id } : null,
+			userMadeClouds: userMadeClouds.map((c) => ({ ...c.toObject(), id: c._id })),
+		});
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG in getSongClouds', err);
+		res.status(500).json({ err });
 	}
 }
 
@@ -501,6 +515,7 @@ async function verifyAdmin(req, res, next) {
 
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
+router.get('/getSongClouds/:songId/:userId', getSongClouds);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.post('/triggerCloudGeneration/:socketId', triggerCloudGeneration);
 router.post('/newCloud/', handleNewCloud);
