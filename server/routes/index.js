@@ -323,12 +323,31 @@ async function getArtistDetails(req, res, next) {
 		artist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
 		await artist.save();
 		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken);
-		res.status(status).json({ artist, songs, nextPage });
+		res.status(200).json({ artist, songs, nextPage });
 		saveSongs(songs);
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
-		res.status(status).json({ status, statusText });
+		res.status(500).json({ status, statusText });
+	}
+}
+
+async function getArtistSongs(req, res, next) {
+	const { params, headers } = req;
+	const { artistId, page } = params;
+	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
+	const { authorization: accessToken } = headers;
+	if (!accessToken) {
+		res.status(401).json({ status: 401, statusText: 'Missing access token. Please sign in first' });
+	}
+	try {
+		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken, page);
+		res.status(200).json({ songs, nextPage });
+		saveSongs(songs);
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG', err);
+		const { status, statusText } = err.response;
+		res.status(500).json({ status, statusText });
 	}
 }
 
@@ -517,6 +536,7 @@ router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
 router.get('/getSongClouds/:songId/:userId', getSongClouds);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
+router.get('/getArtistSongs/:artistId/:page', getArtistSongs);
 router.post('/triggerCloudGeneration/:socketId', triggerCloudGeneration);
 router.post('/newCloud/', handleNewCloud);
 router.post('/getSongLyrics', getSongLyrics);
