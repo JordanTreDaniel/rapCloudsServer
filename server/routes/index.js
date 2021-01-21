@@ -141,6 +141,30 @@ async function getSongClouds(req, res, next) {
 	}
 }
 
+async function apiGetSongLyrics(songPath) {
+	let tries = 1,
+		lyrics = '',
+		lyricStatus;
+	while (tries <= 3 && !lyrics.length) {
+		const { status: _lyricStatus, data: lyricData } = await axios({
+			method: 'get',
+			url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
+			headers: {
+				accept: 'application/json',
+				// host: "api.genius.com",
+				// authorization: `Bearer ${accessToken}`
+			},
+			params: {
+				lyricsPath: songPath,
+			},
+		});
+		lyrics = lyricData.lyrics || '';
+		lyricStatus = _lyricStatus;
+		tries++;
+	}
+	return { lyrics, lyricStatus };
+}
+
 async function getSongLyrics(req, res, next) {
 	const { body } = req;
 	const { songPath, songId } = body;
@@ -148,26 +172,8 @@ async function getSongLyrics(req, res, next) {
 		res.status(400).json({ status: 400, statusText: 'Path to page with lyrics, and song id are required.' });
 	}
 	try {
-		let tries = 1,
-			lyrics = '',
-			lyricStatus;
-		while (tries <= 3 && !lyrics.length) {
-			const { status: _lyricStatus, data: lyricData } = await axios({
-				method: 'get',
-				url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
-				headers: {
-					accept: 'application/json',
-					// host: "api.genius.com",
-					// authorization: `Bearer ${accessToken}`
-				},
-				params: {
-					lyricsPath: songPath,
-				},
-			});
-			lyrics = lyricData.lyrics || '';
-			lyricStatus = _lyricStatus;
-			tries++;
-		}
+		const { lyrics, lyricStatus } = await apiGetSongLyrics(songPath);
+		res.status(lyricStatus).json({ lyrics });
 		let mongooseSong = await Song.findOne({ id: songId }, (err, foundInstance) => {
 			return foundInstance;
 		});
@@ -176,7 +182,6 @@ async function getSongLyrics(req, res, next) {
 			// mongooseSong.markModified('lyrics');
 			const result = await mongooseSong.save();
 		}
-		res.status(lyricStatus).json({ lyrics });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		res.status(500).json({ err });
@@ -280,10 +285,11 @@ const saveSongs = async (songs) => {
 	}
 };
 
-const apiFetchArtistSongs = async (artistId, accessToken, nextPage = 1) => {
+const apiFetchArtistSongs = async (artistId, accessToken, options = {}) => {
+	const { per_page = 20, page = 1 } = options;
 	const { data: artistSongsData } = await axios({
 		method: 'get',
-		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${20}&page=${nextPage}&sort=${'popularity'}`,
+		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${per_page}&page=${page}&sort=${'popularity'}`,
 		headers: {
 			accept: 'application/json',
 			// host: "api.genius.com",
@@ -292,7 +298,7 @@ const apiFetchArtistSongs = async (artistId, accessToken, nextPage = 1) => {
 	});
 	const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
 	const { songs: artistSongs, next_page } = songsDataResponse;
-	nextPage = next_page || null;
+	const nextPage = next_page || null;
 	return { artistSongs, nextPage };
 };
 
@@ -539,7 +545,6 @@ router.get('/getArtistDetails/:artistId', getArtistDetails);
 router.get('/getArtistSongs/:artistId/:page', getArtistSongs);
 router.post('/triggerCloudGeneration/:socketId', triggerCloudGeneration);
 router.post('/newCloud/', handleNewCloud);
-router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks/:userId?', getMasks);
 router.get('/getClouds/:userId?', getClouds);
