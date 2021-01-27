@@ -390,7 +390,7 @@ async function getClouds(req, res, next) {
 	const { params } = req;
 	const { userId = 'default' } = params;
 	try {
-		RapCloud.find({ userId: { $in: [ undefined, userId ] } }, function(err, clouds) {
+		RapCloud.find({ userId: { $in: [ userId ] }, officialCloud: false }, function(err, clouds) {
 			if (err) {
 				res.status(500).json({ message: 'Something went wrong fetching resources from DB', err });
 			}
