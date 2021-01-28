@@ -27,11 +27,16 @@ cloudinary.v2.config({
 });
 const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.rapclouds.com';
 // Accept requests from the client
-app.use(
-	cors({
-		origin: appRootUrl, //TO-DO: Use env vars to distinguish b/t dev & prod
-	}),
-);
+// app.use(
+// 	cors({
+// 		origin: appRootUrl, //TO-DO: Use env vars to distinguish b/t dev & prod
+// 	}),
+// );
+app.use(function(req, res, next) {
+	res.header('Access-Control-Allow-Origin', '*');
+	res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+	next();
+});
 
 mongoose.connect(
 	`mongodb+srv://myself:${process.env.DB_PASSWORD}@cluster0-xlyk2.mongodb.net/${process.env.NODE_ENV === 'development'
