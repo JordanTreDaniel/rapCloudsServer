@@ -37,8 +37,15 @@ async function search(req, res, next) {
 		const { status } = meta;
 		const { hits } = response;
 		const songs = hits.map((hit) => hit.result);
+		const artists = songs.reduce((artists, song) => {
+			const { primary_artist, featured_artists = [] } = song;
+			artists[primary_artist.id] = primary_artist;
+			featured_artists.forEach((artist) => (artists[artist.id] = artist));
+			return artists;
+		}, {});
+		res.status(status).json({ songs, artists });
 		//TO-DO: Is there a way to findManyOrCreate?
-		const mongooseSongs = songs.map(async (song) => {
+		songs.forEach(async (song) => {
 			let mongooseSong = await Song.findOne({ id: song.id }, (err, foundInstance) => {
 				return foundInstance;
 			});
@@ -46,9 +53,8 @@ async function search(req, res, next) {
 				mongooseSong = new Song(song);
 				mongooseSong.save();
 			}
-			return mongooseSong;
+			await saveArtistsFromSong(song);
 		});
-		res.status(status).json({ songs });
 	} catch (err) {
 		const { status, statusText } = err.response;
 		res.status(401).json({ status, statusText });
@@ -68,8 +74,10 @@ const saveArtistsFromSong = async (song) => {
 	for (var artist of artists) {
 		const { id: artistId } = artist;
 		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
-		mongoArtist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
-		await mongoArtist.save();
+		if (!mongoArtist) {
+			mongoArtist = new Artist(artist);
+			await mongoArtist.save();
+		}
 	}
 };
 
@@ -94,7 +102,6 @@ async function getSongDetails(req, res, next) {
 			},
 		});
 		const { meta, response } = data;
-		const { status } = meta;
 		let { song } = response;
 		const { data: ytData, error } = await fetchYtInfo(song);
 		if (!error) song.ytData = ytData;
@@ -108,12 +115,54 @@ async function getSongDetails(req, res, next) {
 			song = new Song(song);
 			await song.save();
 		}
-		res.status(status).json({ song: song.toObject() });
-		await saveArtistsFromSong(song);
+		res.status(200).json({
+			song: song.toObject(),
+		});
+		// await saveArtistsFromSong(song); //TO-DO: Re-instate
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in getSongDetails', err);
-		res.status(status).json({ err });
+		res.status(500).json({ err });
 	}
+}
+
+async function getSongClouds(req, res, next) {
+	const { params } = req;
+	const { songId, userId } = params;
+	try {
+		let officalCloud = await RapCloud.findOne({ songIds: [ songId ], officialCloud: true });
+		let userMadeClouds = await RapCloud.find({ songIds: [ songId ], userId: userId });
+		res.status(200).json({
+			officalCloud: officalCloud ? { ...officalCloud.toObject(), id: officalCloud._id } : null,
+			userMadeClouds: userMadeClouds.map((c) => ({ ...c.toObject(), id: c._id })),
+		});
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG in getSongClouds', err);
+		res.status(500).json({ err });
+	}
+}
+
+async function apiGetSongLyrics(songPath) {
+	let tries = 1,
+		lyrics = '',
+		lyricStatus;
+	while (tries <= 3 && !lyrics.length) {
+		const { status: _lyricStatus, data: lyricData } = await axios({
+			method: 'get',
+			url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
+			headers: {
+				accept: 'application/json',
+				// host: "api.genius.com",
+				// authorization: `Bearer ${accessToken}`
+			},
+			params: {
+				lyricsPath: songPath,
+			},
+		});
+		lyrics = lyricData.lyrics || '';
+		lyricStatus = _lyricStatus;
+		tries++;
+	}
+	return { lyrics, lyricStatus };
 }
 
 async function getSongLyrics(req, res, next) {
@@ -123,26 +172,8 @@ async function getSongLyrics(req, res, next) {
 		res.status(400).json({ status: 400, statusText: 'Path to page with lyrics, and song id are required.' });
 	}
 	try {
-		let tries = 1,
-			lyrics = '',
-			lyricStatus;
-		while (tries <= 3 && !lyrics.length) {
-			const { status: _lyricStatus, data: lyricData } = await axios({
-				method: 'get',
-				url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
-				headers: {
-					accept: 'application/json',
-					// host: "api.genius.com",
-					// authorization: `Bearer ${accessToken}`
-				},
-				params: {
-					lyricsPath: songPath,
-				},
-			});
-			lyrics = lyricData.lyrics || '';
-			lyricStatus = _lyricStatus;
-			tries++;
-		}
+		const { lyrics, lyricStatus } = await apiGetSongLyrics(songPath);
+		res.status(lyricStatus).json({ lyrics });
 		let mongooseSong = await Song.findOne({ id: songId }, (err, foundInstance) => {
 			return foundInstance;
 		});
@@ -151,7 +182,6 @@ async function getSongLyrics(req, res, next) {
 			// mongooseSong.markModified('lyrics');
 			const result = await mongooseSong.save();
 		}
-		res.status(lyricStatus).json({ lyrics });
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		res.status(500).json({ err });
@@ -182,6 +212,7 @@ async function triggerCloudGeneration(req, res, next) {
 		songIds = [],
 		userId,
 		inspirationType = 'song, artist, or album',
+		officialCloud,
 	} = body;
 	const { maskId } = settings;
 	const mask = maskId ? await Mask.findById(maskId).exec() : null;
@@ -194,12 +225,12 @@ async function triggerCloudGeneration(req, res, next) {
 			userId,
 			inspirationType,
 			lyricString,
+			officialCloud,
 		});
 		await newCloud.save();
-		const isLocalBuild = headers.host.match('localhost');
 		const { data, status, error } = await axios({
 			method: 'post',
-			url: isLocalBuild ? 'http://localhost:5000' : `https://rap-clouds-generator.herokuapp.com/`,
+			url: process.env.CLOUD_GEN_ENDPOINT,
 			headers: {
 				'Content-Type': 'application/json',
 				'Access-Control-Allow-Origin': '*',
@@ -210,6 +241,7 @@ async function triggerCloudGeneration(req, res, next) {
 				cloudSettings: settings,
 				socketId,
 				cloudId: newCloud._id,
+				officialCloud,
 			},
 		});
 		const { message } = data;
@@ -221,19 +253,23 @@ async function triggerCloudGeneration(req, res, next) {
 }
 
 async function handleNewCloud(req, res, next) {
-	const { headers, body, data } = req;
-	const { socketId, cloudId, cloudInfo } = body;
-	console.log('handleNewCloud', { socketId, cloudId, cloudInfo });
+	const { body } = req;
+	const { socketId, cloudId, cloudInfo, error } = body;
 	try {
-		const rapCloud = await RapCloud.findOneAndUpdate(
-			{ _id: cloudId },
-			{ info: cloudInfo },
-			{ new: true, useFindAndModify: false },
-		);
-		await rapCloud.save();
 		const io = req.app.get('io');
-		io.in(socketId).emit('RapCloudFinished', { ...rapCloud.toObject(), id: rapCloud._id });
-		res.status(200).json({ message: 'Cloud is saved and sent back to client.' });
+		if (error) {
+			io.in(socketId).emit('RapCloudError', { error, cloudId, socketId });
+			res.status(200).json({ message: 'Error received from python script & reported to React app.' });
+		} else {
+			const rapCloud = await RapCloud.findOneAndUpdate(
+				{ _id: cloudId },
+				{ info: cloudInfo },
+				{ new: true, useFindAndModify: false },
+			);
+			await rapCloud.save();
+			io.in(socketId).emit('RapCloudFinished', { ...rapCloud.toObject(), id: rapCloud._id });
+			res.status(200).json({ message: 'Cloud is saved and sent back to client.' });
+		}
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in handleNewCloud', { err });
 		res.status(500).json({ err });
@@ -249,10 +285,11 @@ const saveSongs = async (songs) => {
 	}
 };
 
-const apiFetchArtistSongs = async (artistId, accessToken, nextPage = 1) => {
+const apiFetchArtistSongs = async (artistId, accessToken, options = {}) => {
+	const { per_page = 20, page = 1 } = options;
 	const { data: artistSongsData } = await axios({
 		method: 'get',
-		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${20}&page=${nextPage}&sort=${'popularity'}`,
+		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${per_page}&page=${page}&sort=${'popularity'}`,
 		headers: {
 			accept: 'application/json',
 			// host: "api.genius.com",
@@ -261,7 +298,7 @@ const apiFetchArtistSongs = async (artistId, accessToken, nextPage = 1) => {
 	});
 	const { meta: songsDataMeta, response: songsDataResponse } = artistSongsData;
 	const { songs: artistSongs, next_page } = songsDataResponse;
-	nextPage = next_page || null;
+	const nextPage = next_page || null;
 	return { artistSongs, nextPage };
 };
 
@@ -292,12 +329,31 @@ async function getArtistDetails(req, res, next) {
 		artist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
 		await artist.save();
 		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken);
-		res.status(status).json({ artist, songs, nextPage });
+		res.status(200).json({ artist, songs, nextPage });
 		saveSongs(songs);
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
-		res.status(status).json({ status, statusText });
+		res.status(500).json({ status, statusText });
+	}
+}
+
+async function getArtistSongs(req, res, next) {
+	const { params, headers } = req;
+	const { artistId, page } = params;
+	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
+	const { authorization: accessToken } = headers;
+	if (!accessToken) {
+		res.status(401).json({ status: 401, statusText: 'Missing access token. Please sign in first' });
+	}
+	try {
+		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken, page);
+		res.status(200).json({ songs, nextPage });
+		saveSongs(songs);
+	} catch (err) {
+		console.log('SOMETHING WENT WRONG', err);
+		const { status, statusText } = err.response;
+		res.status(500).json({ status, statusText });
 	}
 }
 
@@ -334,7 +390,7 @@ async function getClouds(req, res, next) {
 	const { params } = req;
 	const { userId = 'default' } = params;
 	try {
-		RapCloud.find({ userId: { $in: [ undefined, userId ] } }, function(err, clouds) {
+		RapCloud.find({ userId: { $in: [ userId ] }, officialCloud: false }, function(err, clouds) {
 			if (err) {
 				res.status(500).json({ message: 'Something went wrong fetching resources from DB', err });
 			}
@@ -381,7 +437,9 @@ async function deleteCloud(req, res, next) {
 	const { cloudId, public_id } = body;
 	try {
 		await RapCloud.findOneAndDelete({ _id: cloudId }).exec();
-		await cloudinary.v2.uploader.destroy(public_id);
+		if (public_id) {
+			await cloudinary.v2.uploader.destroy(public_id);
+		}
 		res.status(200).json({
 			message: 'Deleted Successfully.',
 			cloudId,
@@ -482,10 +540,11 @@ async function verifyAdmin(req, res, next) {
 
 router.get('/search', search);
 router.get('/getSongDetails/:songId', getSongDetails);
+router.get('/getSongClouds/:songId/:userId', getSongClouds);
 router.get('/getArtistDetails/:artistId', getArtistDetails);
+router.get('/getArtistSongs/:artistId/:page', getArtistSongs);
 router.post('/triggerCloudGeneration/:socketId', triggerCloudGeneration);
 router.post('/newCloud/', handleNewCloud);
-router.post('/getSongLyrics', getSongLyrics);
 router.post('/getSongLyrics', getSongLyrics);
 router.get('/masks/:userId?', getMasks);
 router.get('/getClouds/:userId?', getClouds);
