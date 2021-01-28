@@ -26,6 +26,9 @@ var server = http.createServer(app);
  * so that we can access them later in the controller
  */
 const io = socketio(server);
+io.origins((_, callback) => {
+	callback(null, true);
+});
 app.set('io', io);
 
 /**
