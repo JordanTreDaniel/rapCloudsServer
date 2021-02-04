@@ -40,11 +40,10 @@ const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:30
 // 	next();
 // });
 
-const whitelist = [ 'https://www.rapclouds.com' ];
+const whitelist = [ 'https://www.rapclouds.com', 'http://localhost:3000' ];
 app.use(
 	cors({
 		origin: function(origin, callback) {
-			console.log('Second cors block');
 			// allow requests with no origin
 			if (!origin) return callback(null, true);
 			if (whitelist.indexOf(origin) === -1) {
