@@ -286,7 +286,7 @@ const saveSongs = async (songs) => {
 };
 
 const apiFetchArtistSongs = async (artistId, accessToken, options = {}) => {
-	const { per_page = 20, page = 1 } = options;
+	const { per_page = 9, page = 1 } = options;
 	const { data: artistSongsData } = await axios({
 		method: 'get',
 		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${per_page}&page=${page}&sort=${'popularity'}`,
@@ -321,16 +321,13 @@ async function getArtistDetails(req, res, next) {
 				authorization: `Bearer ${accessToken}`,
 			},
 		});
-		const { meta, response } = data;
+		const { _, response } = data;
 
-		const { status } = meta;
 		let { artist } = response;
 		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
 		artist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
+		res.status(200).json({ artist });
 		await artist.save();
-		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken);
-		res.status(200).json({ artist, songs, nextPage });
-		saveSongs(songs);
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
@@ -340,14 +337,14 @@ async function getArtistDetails(req, res, next) {
 
 async function getArtistSongs(req, res, next) {
 	const { params, headers } = req;
-	const { artistId, page } = params;
+	const { artistId, page = 1 } = params;
 	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
 	const { authorization: accessToken } = headers;
 	if (!accessToken) {
 		res.status(401).json({ status: 401, statusText: 'Missing access token. Please sign in first' });
 	}
 	try {
-		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken, page);
+		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken, { page });
 		res.status(200).json({ songs, nextPage });
 		saveSongs(songs);
 	} catch (err) {
