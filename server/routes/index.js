@@ -474,6 +474,7 @@ async function deleteAllClouds(req, res, next) {
 	}
 }
 
+//TO-DO: Put this function on automatic timer
 async function deleteBadClouds(req, res, next) {
 	try {
 		const rapClouds = await RapCloud.deleteMany({ info: undefined }).exec();
