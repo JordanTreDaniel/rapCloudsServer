@@ -132,8 +132,9 @@ async function getSongClouds(req, res, next) {
 		let officalCloud = await RapCloud.findOne({ songIds: [ songId ], officialCloud: true });
 		let userMadeClouds = await RapCloud.find({ songIds: [ songId ], userId: userId });
 		res.status(200).json({
-			officalCloud: officalCloud ? { ...officalCloud.toObject(), id: officalCloud._id } : null,
-			userMadeClouds: userMadeClouds.map((c) => ({ ...c.toObject(), id: c._id })),
+			officalCloud:
+				officalCloud && officalCloud.info ? { ...officalCloud.toObject(), id: officalCloud._id } : null,
+			userMadeClouds: userMadeClouds.filter((cloud) => !cloud.info).map((c) => ({ ...c.toObject(), id: c._id })),
 		});
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in getSongClouds', err);
@@ -286,7 +287,7 @@ const saveSongs = async (songs) => {
 };
 
 const apiFetchArtistSongs = async (artistId, accessToken, options = {}) => {
-	const { per_page = 20, page = 1 } = options;
+	const { per_page = 9, page = 1 } = options;
 	const { data: artistSongsData } = await axios({
 		method: 'get',
 		url: `https://api.genius.com/artists/${artistId}/songs?per_page=${per_page}&page=${page}&sort=${'popularity'}`,
@@ -321,16 +322,13 @@ async function getArtistDetails(req, res, next) {
 				authorization: `Bearer ${accessToken}`,
 			},
 		});
-		const { meta, response } = data;
+		const { _, response } = data;
 
-		const { status } = meta;
 		let { artist } = response;
 		let mongoArtist = await Artist.findOne({ id: artistId }).exec();
 		artist = mongoArtist ? Object.assign(mongoArtist, artist) : new Artist(artist);
+		res.status(200).json({ artist });
 		await artist.save();
-		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken);
-		res.status(200).json({ artist, songs, nextPage });
-		saveSongs(songs);
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG', err);
 		const { status, statusText } = err.response;
@@ -340,14 +338,14 @@ async function getArtistDetails(req, res, next) {
 
 async function getArtistSongs(req, res, next) {
 	const { params, headers } = req;
-	const { artistId, page } = params;
+	const { artistId, page = 1 } = params;
 	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
 	const { authorization: accessToken } = headers;
 	if (!accessToken) {
 		res.status(401).json({ status: 401, statusText: 'Missing access token. Please sign in first' });
 	}
 	try {
-		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken, page);
+		const { artistSongs: songs, nextPage } = await apiFetchArtistSongs(artistId, accessToken, { page });
 		res.status(200).json({ songs, nextPage });
 		saveSongs(songs);
 	} catch (err) {
@@ -395,7 +393,9 @@ async function getClouds(req, res, next) {
 				res.status(500).json({ message: 'Something went wrong fetching resources from DB', err });
 			}
 			//TO-DO: Modify query to pull public assets as well
-			res.status(200).json({ clouds: clouds.map((cloud) => ({ ...cloud.toObject(), id: cloud._id })) });
+			res.status(200).json({
+				clouds: clouds.filter((cloud) => !cloud.info).map((cloud) => ({ ...cloud.toObject(), id: cloud._id })),
+			});
 		});
 	} catch (error) {
 		res.status(500).json(error);
@@ -470,6 +470,20 @@ async function deleteAllClouds(req, res, next) {
 		});
 	} catch (error) {
 		console.log('Something went wrong in deleteAllClouds', error);
+		res.status(500).json(error);
+	}
+}
+
+//TO-DO: Put this function on automatic timer
+async function deleteBadClouds(req, res, next) {
+	try {
+		const rapClouds = await RapCloud.deleteMany({ info: undefined }).exec();
+		res.status(200).json({
+			message: 'Deleted Successfully.',
+			rapClouds,
+		});
+	} catch (error) {
+		console.log('Something went wrong in deleteBadClouds', error);
 		res.status(500).json(error);
 	}
 }
@@ -554,6 +568,7 @@ router.post('/deleteCloud', deleteCloud);
 //Admin Endpoints
 router.get('/views/:adminPassword', verifyAdmin, views);
 router.get('/deleteAllClouds/:adminPassword', verifyAdmin, deleteAllClouds);
+router.get('/deleteBadClouds/:adminPassword', verifyAdmin, deleteBadClouds);
 router.get('/pruneCloudinary/:adminPassword', verifyAdmin, pruneCloudinary);
 router.get('/seed/:adminPassword', verifyAdmin, seed);
 
