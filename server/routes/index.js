@@ -132,8 +132,9 @@ async function getSongClouds(req, res, next) {
 		let officalCloud = await RapCloud.findOne({ songIds: [ songId ], officialCloud: true });
 		let userMadeClouds = await RapCloud.find({ songIds: [ songId ], userId: userId });
 		res.status(200).json({
-			officalCloud: officalCloud ? { ...officalCloud.toObject(), id: officalCloud._id } : null,
-			userMadeClouds: userMadeClouds.map((c) => ({ ...c.toObject(), id: c._id })),
+			officalCloud:
+				officalCloud && officalCloud.info ? { ...officalCloud.toObject(), id: officalCloud._id } : null,
+			userMadeClouds: userMadeClouds.filter((cloud) => !cloud.info).map((c) => ({ ...c.toObject(), id: c._id })),
 		});
 	} catch (err) {
 		console.log('SOMETHING WENT WRONG in getSongClouds', err);
@@ -392,7 +393,9 @@ async function getClouds(req, res, next) {
 				res.status(500).json({ message: 'Something went wrong fetching resources from DB', err });
 			}
 			//TO-DO: Modify query to pull public assets as well
-			res.status(200).json({ clouds: clouds.map((cloud) => ({ ...cloud.toObject(), id: cloud._id })) });
+			res.status(200).json({
+				clouds: clouds.filter((cloud) => !cloud.info).map((cloud) => ({ ...cloud.toObject(), id: cloud._id })),
+			});
 		});
 	} catch (error) {
 		res.status(500).json(error);
