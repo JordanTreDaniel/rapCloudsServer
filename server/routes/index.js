@@ -471,6 +471,19 @@ async function deleteAllClouds(req, res, next) {
 	}
 }
 
+async function deleteBadClouds(req, res, next) {
+	try {
+		const rapClouds = await RapCloud.deleteMany({ info: undefined }).exec();
+		res.status(200).json({
+			message: 'Deleted Successfully.',
+			rapClouds,
+		});
+	} catch (error) {
+		console.log('Something went wrong in deleteBadClouds', error);
+		res.status(500).json(error);
+	}
+}
+
 async function pruneCloudinary(req, res, next) {
 	try {
 		let cloudinaryResult,
@@ -551,6 +564,7 @@ router.post('/deleteCloud', deleteCloud);
 //Admin Endpoints
 router.get('/views/:adminPassword', verifyAdmin, views);
 router.get('/deleteAllClouds/:adminPassword', verifyAdmin, deleteAllClouds);
+router.get('/deleteBadClouds/:adminPassword', verifyAdmin, deleteBadClouds);
 router.get('/pruneCloudinary/:adminPassword', verifyAdmin, pruneCloudinary);
 router.get('/seed/:adminPassword', verifyAdmin, seed);
 
