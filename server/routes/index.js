@@ -528,7 +528,7 @@ async function pruneCloudinary(req, res, next) {
 		res.status(500).json(error);
 	}
 }
-
+ 
 async function seed(req, res, next) {
 	try {
 		await seedDB();
