@@ -183,14 +183,24 @@ async function getSongClouds(req, res, next) {
       songIds: [songId],
       userId: userId,
     });
+    const officalCloudTimeStamp = officalCloud
+      ? officalCloud._id.getTimestamp()
+      : null;
     res.status(200).json({
       officalCloud:
         officalCloud && officalCloud.info
-          ? { ...officalCloud.toObject(), id: officalCloud._id }
+          ? {
+              ...officalCloud.toObject(),
+              createdAt: officalCloudTimeStamp,
+              id: officalCloud._id,
+            }
           : null,
       userMadeClouds: userMadeClouds
         .filter((cloud) => !cloud.info)
-        .map((c) => ({ ...c.toObject(), id: c._id })),
+        .map((c) => {
+          const timeStamp = c._id.getTimestamp();
+          return { ...c.toObject(), createdAt: timeStamp, id: c._id };
+        }),
     });
   } catch (err) {
     console.log("SOMETHING WENT WRONG in getSongClouds", err);
@@ -528,19 +538,25 @@ async function deleteMask(req, res, next) {
   }
 }
 
-async function deleteCloud(req, res, next) {
+async function deleteClouds(req, res, next) {
   const { body } = req;
-  const { cloudId, public_id } = body;
+  const { cloudIds } = body;
   try {
-    await RapCloud.findOneAndDelete({ _id: cloudId }).exec();
-    if (public_id) {
-      await cloudinary.v2.uploader.destroy(public_id);
+    for (const cloudId of cloudIds) {
+      const cloud = await RapCloud.findById(cloudId);
+      const cloudAsObject = cloud ? cloud.toObject : {};
+      const { public_id } = cloudAsObject["info"] || {};
+      await RapCloud.findOneAndDelete({ _id: cloudId.toString() }).exec();
+      if (public_id) {
+        await cloudinary.v2.uploader.destroy(public_id);
+      }
     }
     res.status(200).json({
       message: "Deleted Successfully.",
-      cloudId,
+      cloudIds,
     });
   } catch (error) {
+    console.dir(error);
     res.status(500).json(error);
   }
 }
@@ -573,6 +589,7 @@ async function deleteAllClouds(req, res, next) {
 //TO-DO: Put this function on automatic timer
 async function deleteBadClouds(req, res, next) {
   try {
+    //Should be deleting the correspoding cloudinary object here?
     const rapClouds = await RapCloud.deleteMany({ info: undefined }).exec();
     res.status(200).json({
       message: "Deleted Successfully.",
@@ -586,41 +603,48 @@ async function deleteBadClouds(req, res, next) {
 
 async function pruneCloudinary(req, res, next) {
   try {
-    let cloudinaryResult,
-      next_cursor,
-      resources = [];
-    const cloudinaryCallOptions = { max_results: 500 };
+    let cloudinaryResult, next_cursor;
+    const cloudinaryCallOptions = { max_results: 500, resource_type: "image" };
     do {
       await cloudinary.v2.api.resources(
         cloudinaryCallOptions,
-        function (error, result) {
+        async function (error, result) {
           cloudinaryResult = result;
           next_cursor = result.next_cursor;
-          resources.push(...result.resources);
+          if (next_cursor) {
+            cloudinaryCallOptions["next_cursor"] = next_cursor;
+          }
+          for (const resource of result.resources) {
+            const { public_id } = resource;
+            const matchingClouds = await RapCloud.find({
+              "info.public_id": public_id,
+            });
+            const matchingMasks = await Mask.find({
+              "info.public_id": public_id,
+            });
+            const conditions = [!matchingClouds.length, !matchingMasks.length];
+            const matchesDev = public_id.toLowerCase().match("dev");
+            conditions.push(
+              process.env.NODE_ENV === "development" ? matchesDev : !matchesDev
+            );
+            if (conditions.every((c) => c)) {
+              console.log(
+                "Found a resource with no matching rapCloud or mask",
+                resource
+              );
+              await cloudinary.v2.uploader.destroy(public_id);
+              deletedResources.push(public_id);
+            }
+          }
+          //   resources.push(...result.resources);
         }
       );
     } while (next_cursor);
 
     const deletedResources = [];
-    for (const resource of resources) {
-      const { public_id } = resource;
-      const rapClouds = await RapCloud.find({ "info.public_id": public_id });
-      const masks = await Mask.find({ "info.public_id": public_id });
-      // console.log({ rapClouds, masks });
-      const conditions = [!rapClouds.length, !masks.length];
-      const matchesDev = public_id.toLowerCase().match("dev");
-      conditions.push(
-        process.env.NODE_ENV === "development" ? matchesDev : !matchesDev
-      );
-      if (conditions.every((c) => c)) {
-        // console.log('Found a resource with no matching rapCloud or mask', resource);
-        await cloudinary.v2.uploader.destroy(public_id);
-        deletedResources.push(public_id);
-      }
-    }
+
     res.status(200).json({
       message: "Pruned Successfully.",
-      resources,
       deletedResources,
       cloudinaryResult,
     });
@@ -666,7 +690,7 @@ router.get("/masks/:userId?", getMasks);
 router.get("/getClouds/:userId?", getClouds);
 router.post("/addMask", addMask);
 router.post("/deleteMask", deleteMask);
-router.post("/deleteCloud", deleteCloud);
+router.post("/deleteClouds", deleteClouds);
 //Admin Endpoints
 router.get("/views/:adminPassword", verifyAdmin, views);
 router.get("/deleteAllClouds/:adminPassword", verifyAdmin, deleteAllClouds);
