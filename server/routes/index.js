@@ -210,9 +210,9 @@ async function getSongClouds(req, res, next) {
 
 async function apiGetSongLyrics(songPath) {
   let tries = 1,
-    lyrics = "",
+    lyrics = null,
     lyricStatus;
-  while (tries <= 3 && !lyrics.length) {
+  while (tries <= 3 && (!lyrics || !lyrics.length)) {
     const { status: _lyricStatus, data: lyricData } = await axios({
       method: "get",
       url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
@@ -225,7 +225,7 @@ async function apiGetSongLyrics(songPath) {
         lyricsPath: songPath,
       },
     });
-    lyrics = lyricData.lyrics || "";
+    lyrics = lyricData.lyrics || null;
     lyricStatus = _lyricStatus;
     tries++;
   }
