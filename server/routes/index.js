@@ -7,6 +7,7 @@ import Artist from "../db/models/Artist";
 import seedDB from "../db/seed";
 import cloudinary from "cloudinary";
 import fs from "fs";
+import a from "genius-lyrics";
 const router = express.Router();
 
 async function search(req, res, next) {
@@ -208,42 +209,28 @@ async function getSongClouds(req, res, next) {
   }
 }
 
-async function apiGetSongLyrics(songPath) {
-  let tries = 1,
-    lyrics = null,
-    lyricStatus;
-  while (tries <= 3 && (!lyrics || !lyrics.length)) {
-    const { status: _lyricStatus, data: lyricData } = await axios({
-      method: "get",
-      url: `https://ukaecdgqm1.execute-api.us-east-1.amazonaws.com/default/getGeniusRapLyrics`,
-      headers: {
-        accept: "application/json",
-        // host: "api.genius.com",
-        // authorization: `Bearer ${accessToken}`
-      },
-      params: {
-        lyricsPath: songPath,
-      },
-    });
-    lyrics = lyricData.lyrics || null;
-    lyricStatus = _lyricStatus;
-    tries++;
-  }
-  return { lyrics, lyricStatus };
+async function apiGetSongLyrics(songId, accessToken) {
+  const Client = new a.Client(accessToken);
+  const song = await Client.songs.get(parseInt(songId));
+  const lyrics = await song.lyrics();
+  return { lyrics: lyrics || null };
 }
 
 async function getSongLyrics(req, res, next) {
-  const { body } = req;
-  const { songPath, songId } = body;
-  if (!songPath || !songId) {
+  const { body, headers } = req;
+  const { songId } = body;
+  const { authorization: accessToken } = headers;
+
+  if (!songId) {
     res.status(400).json({
       status: 400,
-      statusText: "Path to page with lyrics, and song id are required.",
+      statusText:
+        "Song ID is required to fetch the lyrics using genius-lyrics package.",
     });
   }
   try {
-    const { lyrics, lyricStatus } = await apiGetSongLyrics(songPath);
-    res.status(lyricStatus).json({ lyrics });
+    const { lyrics } = await apiGetSongLyrics(songPath, songId, accessToken);
+    res.status(200).json({ lyrics });
     let mongooseSong = await Song.findOne(
       { id: songId },
       (err, foundInstance) => {
