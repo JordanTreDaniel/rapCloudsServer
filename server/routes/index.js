@@ -229,7 +229,7 @@ async function getSongLyrics(req, res, next) {
     });
   }
   try {
-    const { lyrics } = await apiGetSongLyrics(songPath, songId, accessToken);
+    const { lyrics } = await apiGetSongLyrics(songId, accessToken);
     res.status(200).json({ lyrics });
     let mongooseSong = await Song.findOne(
       { id: songId },
