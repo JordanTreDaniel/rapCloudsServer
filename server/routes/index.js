@@ -274,6 +274,7 @@ async function triggerCloudGeneration(req, res, next) {
     inspirationType = "song, artist, or album",
     officialCloud,
   } = body;
+
   const { maskId } = settings;
   const mask = maskId ? await Mask.findById(maskId).exec() : null;
   try {
@@ -445,6 +446,18 @@ const views = (req, res, next) => {
   } else {
     req.session.views = 1;
     res.end("welcome to the session demo. refresh!");
+  }
+};
+
+const testPython = async (req, res, next) => {
+  try {
+    console.log("testing python @ ", process.env.PYTHON_TEST_URL);
+    await axios.get(process.env.PYTHON_TEST_URL);
+    console.log("Everything is good", { res });
+    res.status(200).json("yay");
+  } catch (error) {
+    console.log("Problem during python test", error);
+    res.status(500).json({ message: "Couldn't do it fam", error });
   }
 };
 
@@ -680,6 +693,7 @@ router.post("/deleteMask", deleteMask);
 router.post("/deleteClouds", deleteClouds);
 //Admin Endpoints
 router.get("/views/:adminPassword", verifyAdmin, views);
+router.get("/testPython", testPython);
 router.get("/deleteAllClouds/:adminPassword", verifyAdmin, deleteAllClouds);
 router.get("/deleteBadClouds/:adminPassword", verifyAdmin, deleteBadClouds);
 router.get("/pruneCloudinary/:adminPassword", verifyAdmin, pruneCloudinary);
