@@ -248,6 +248,16 @@ async function getSongLyrics(req, res, next) {
   }
 }
 
+async function getGoogleFonts(req, res, next) {
+  try {
+    const {data} = await axios({method: "get", url: `https://www.googleapis.com/webfonts/v1/webfonts?key=${process.env.GOOGLE_API_KEY}`})
+    const {items} = data;
+    res.status(200).json({fonts: items || []})
+  } catch (error) {
+    console.error("Something went wrong while fetching fonts", error)
+  }
+}
+ 
 async function base64ToFile(fileName, data) {
   return new Promise((resolve, reject) => {
     fs.writeFile(fileName, data, "base64", function (err) {
@@ -678,6 +688,8 @@ async function verifyAdmin(req, res, next) {
 }
 
 router.get("/search", search);
+router.get("/getGoogleFonts", getGoogleFonts);
+router.post("/getSongLyrics", getSongLyrics);
 router.post("/setSongLyrics/:songId", setSongLyrics);
 router.get("/getSongDetails/:songId", getSongDetails);
 router.get("/getSongClouds/:songId/:userId", getSongClouds);
@@ -685,7 +697,6 @@ router.get("/getArtistDetails/:artistId", getArtistDetails);
 router.get("/getArtistSongs/:artistId/:page", getArtistSongs);
 router.post("/triggerCloudGeneration/:socketId", triggerCloudGeneration);
 router.post("/newCloud/", handleNewCloud);
-router.post("/getSongLyrics", getSongLyrics);
 router.get("/masks/:userId?", getMasks);
 router.get("/getClouds/:userId?", getClouds);
 router.post("/addMask", addMask);
