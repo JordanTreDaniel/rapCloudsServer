@@ -14,7 +14,7 @@
   <body>
     <div id="container">
       <div id="rap-clouds-logo" />
-      <button id="window-closer">
+      <button id="window-closer" style="font-size: 3em">
         Close this tab and return to RapClouds.com
       </button>
       <h1>Success!</h1>
@@ -25,9 +25,13 @@
     </div>
 
     <script type="text/javascript">
-      setTimeout(function closeCurrentTab() {
+      function closeCurrentTab() {
         window.close();
-      }, 333);
+      }
+      setTimeout(closeCurrentTab, 333);
+      document
+        .querySelector("#window-closer")
+        .addEventListener("click", closeCurrentTab);
     </script>
   </body>
 </html>
