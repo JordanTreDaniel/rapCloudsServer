@@ -25,12 +25,10 @@
     </div>
 
     <script type="text/javascript">
-      alert("Running JS");
       function closeCurrentTab() {
-        alert("closeCurrentTabActived");
         window.close();
       }
-      setTimeout(closeCurrentTab, 333);
+      setTimeout(closeCurrentTab, 222);
       document
         .querySelector("#window-closer")
         .addEventListener("click", closeCurrentTab);
