@@ -1,8 +1,25 @@
 body {
-  padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+	padding: 50px;
+	font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+}
+
+#container {
+	width: "100vw";
+	height: "100vh" !important;
+	background-color: blue;
+	display: flex;
+	justify-content: center;
+	align-items: center;
 }
 
 a {
-  color: #00B7FF;
+	color: #00b7ff;
+}
+
+#rap-clouds-logo {
+	background-image: url("https://res.cloudinary.com/rap-clouds/image/upload/v1647599476/admin/rapClouds_pygxis.png");
+}
+
+#window-closer {
+	font-size: 3em;
 }

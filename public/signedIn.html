@@ -1,16 +1,33 @@
 <!DOCTYPE html>
 <html>
-
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>RapClouds Sign In Successful</title>
-</head>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="/stylesheets/style.css"
+      media="”screen”"
+    />
+  </head>
 
-<body>
-    <h1>Success!</h1>
-    <p>You are now signed in. This tab should automatically close. If not, please close it and return to <a
-            href="rapclouds.com"> rapclouds.com</a>
-    </p>
-</body>
+  <body>
+    <div id="container">
+      <div id="rap-clouds-logo" />
+      <button id="window-closer">
+        Close this tab and return to RapClouds.com
+      </button>
+      <h1>Success!</h1>
+      <p>
+        You are now signed in. This tab should automatically close. If not,
+        please close it and return to <a href="rapclouds.com"> rapclouds.com</a>
+      </p>
+    </div>
 
+    <script type="text/javascript">
+      setTimeout(function closeCurrentTab() {
+        window.close();
+      }, 333);
+    </script>
+  </body>
 </html>
