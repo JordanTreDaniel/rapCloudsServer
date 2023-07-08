@@ -6,30 +6,47 @@
 import 'babel-polyfill';
 import app from '../app';
 import debugLib from 'debug';
-import http from 'http';
-const debug = debugLib('your-project-name:server');
-const socketio = require('socket.io');
+import {createServer} from 'http';
+const debug = debugLib('rap-clouds-node-server:server');
+import { Server } from "socket.io";
+
+
+
+
 /**
  * Get port from environment and store in Express.
- */
+*/
 
 var port = normalizePort(process.env.PORT || '3333');
 app.set('port', port);
 
 /**
  * Create HTTP server.
- */
+*/
 
-var server = http.createServer(app);
+var server = createServer(app);
 
 /** Connecting sockets to the server and adding them to the request
  * so that we can access them later in the controller
- */
-const io = socketio(server);
-io.origins((_, callback) => {
-	callback(null, true);
-});
+*/
+const reactAppOrigin = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.rapclouds.com';
+
+const io = new Server(server, {
+	cors: {
+	  origin: reactAppOrigin,
+	}
+  });
 app.set('io', io);
+io.on("connection", (socket) => {
+	console.log("a user connected");
+	// send a message to the client
+	socket.emit("hello from server", 1, "2", { 3: Buffer.from([4]) });
+	
+	// receive a message from the client
+	socket.on("hello from client", (...args) => {
+		// ...
+	});
+});
 
 /**
  * Listen on provided port, on all network interfaces.

@@ -687,6 +687,16 @@ async function verifyAdmin(req, res, next) {
   }
 }
 
+//write a ping function
+async function ping(req, res, next) {
+  try {
+    res.status(200).json("RapClouds!");
+  } catch (error) {
+    res.status(500).json(error);
+  }
+}
+
+router.get("/ping", ping);
 router.get("/search", search);
 router.get("/getGoogleFonts", getGoogleFonts);
 router.post("/getSongLyrics", getSongLyrics);
