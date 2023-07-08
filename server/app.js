@@ -14,18 +14,18 @@ import dotenv from 'dotenv';
 import passportInit from './passportInit';
 import authRouter from './routes/auth';
 import cloudinary from 'cloudinary';
+import mongoose from 'mongoose';
+import MongoStore from 'connect-mongo';
 
-const mongoose = require('mongoose');
-const MongoStore = require('connect-mongo')(session);
 const app = express();
 //env variables
 dotenv.config();
 cloudinary.v2.config({
-	cloud_name: 'rap-clouds',
-	api_key: process.env.CLOUDINARY_KEY,
-	api_secret: process.env.CLOUDINARY_SECRET,
+    cloud_name: 'rap-clouds',
+    api_key: process.env.CLOUDINARY_KEY,
+    api_secret: process.env.CLOUDINARY_SECRET,
 });
-const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.rapclouds.com';
+
 // Accept requests from the client
 // app.use(
 // 	cors({
@@ -40,45 +40,45 @@ const appRootUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:30
 // 	next();
 // });
 
-const whitelist = [ 'https://www.rapclouds.com', 'http://localhost:3000' ];
+const whitelist = ['https://www.rapclouds.com', 'http://localhost:3000'];
 app.use(
-	cors({
-		origin: function(origin, callback) {
-			// allow requests with no origin
-			if (!origin) return callback(null, true);
-			if (whitelist.indexOf(origin) === -1) {
-				var message = `The CORS policy for this origin doesn't allow access from the particular origin.`;
-				return callback(new Error(message), false);
-			}
-			return callback(null, true);
-		},
-	}),
+    cors({
+        origin: function (origin, callback) {
+            // allow requests with no origin
+            if (!origin) return callback(null, true);
+            if (whitelist.indexOf(origin) === -1) {
+                var message = `The CORS policy for this origin doesn't allow access from the particular origin.`;
+                return callback(new Error(message), false);
+            }
+            return callback(null, true);
+        },
+    })
 );
 
+const mongoUrl = `mongodb+srv://myself:${
+    process.env.DB_PASSWORD
+}@cluster0-xlyk2.mongodb.net/${
+    process.env.NODE_ENV === 'development' ? 'dev' : 'prod'
+}?retryWrites=true&w=majority`;
 
-mongoose.connect(
-	`mongodb+srv://myself:${process.env.DB_PASSWORD}@cluster0-xlyk2.mongodb.net/${process.env.NODE_ENV === 'development'
-		? 'dev'
-		: 'prod'}?retryWrites=true&w=majority`,
-	{ useNewUrlParser: true, useUnifiedTopology: true },
-);
+mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true });
 mongoose.Promise = global.Promise;
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', function() {
-	console.log('db connected');
-	// we're connected!
+db.once('open', function () {
+    console.log('db connected');
+    // we're connected!
 });
 
 //Set up for express-session
 app.use(
-	session({
-		secret: 'jordansreallygoodsecret', //TO-DO: Use an env variable
-		resave: true,
-		saveUninitialized: true,
-		store: new MongoStore({ mongooseConnection: db }),
-		//TO-DO: Should I use genId here?
-	}),
+    session({
+        secret: 'jordansreallygoodsecret', //TO-DO: Use an env variable
+        resave: true,
+        saveUninitialized: true,
+        store: MongoStore.create({ mongoUrl }),
+        //TO-DO: Should I use genId here?
+    })
 );
 
 //passport initialization
