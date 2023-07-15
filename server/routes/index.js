@@ -250,14 +250,17 @@ async function getSongLyrics(req, res, next) {
 
 async function getGoogleFonts(req, res, next) {
   try {
-    const {data} = await axios({method: "get", url: `https://www.googleapis.com/webfonts/v1/webfonts?key=${process.env.GOOGLE_API_KEY}`})
-    const {items} = data;
-    res.status(200).json({fonts: items || []})
+    const { data } = await axios({
+      method: "get",
+      url: `https://www.googleapis.com/webfonts/v1/webfonts?key=${process.env.GOOGLE_API_KEY}`,
+    });
+    const { items } = data;
+    res.status(200).json({ fonts: items || [] });
   } catch (error) {
-    console.error("Something went wrong while fetching fonts", error)
+    console.error("Something went wrong while fetching fonts", error);
   }
 }
- 
+
 async function base64ToFile(fileName, data) {
   return new Promise((resolve, reject) => {
     fs.writeFile(fileName, data, "base64", function (err) {
@@ -316,9 +319,10 @@ async function triggerCloudGeneration(req, res, next) {
       },
     });
     const { message } = data;
-    res
-      .status(200)
-      .json({ cloud: { ...newCloud.toObject(), id: newCloud._id }, message });
+    res.status(200).json({
+      cloud: { ...newCloud.toObject(), id: newCloud._id },
+      message,
+    });
   } catch (err) {
     console.log("SOMETHING WENT WRONG in triggerCloudGeneration", { err });
     res.status(500).json({ err });
@@ -346,9 +350,9 @@ async function handleNewCloud(req, res, next) {
         ...rapCloud.toObject(),
         id: rapCloud._id,
       });
-      res
-        .status(200)
-        .json({ message: "Cloud is saved and sent back to client." });
+      res.status(200).json({
+        message: "Cloud is saved and sent back to client.",
+      });
     }
   } catch (err) {
     console.log("SOMETHING WENT WRONG in handleNewCloud", { err });
@@ -484,7 +488,10 @@ async function getMasks(req, res, next) {
       }
       //TO-DO: Modify query to pull public assets as well
       res.status(200).json({
-        masks: masks.map((mask) => ({ ...mask.toObject(), id: mask._id })),
+        masks: masks.map((mask) => ({
+          ...mask.toObject(),
+          id: mask._id,
+        })),
       });
     });
   } catch (error) {
@@ -509,7 +516,10 @@ async function getClouds(req, res, next) {
         res.status(200).json({
           clouds: clouds
             .filter((cloud) => !cloud.info)
-            .map((cloud) => ({ ...cloud.toObject(), id: cloud._id })),
+            .map((cloud) => ({
+              ...cloud.toObject(),
+              id: cloud._id,
+            })),
         });
       }
     );
@@ -614,7 +624,10 @@ async function deleteBadClouds(req, res, next) {
 async function pruneCloudinary(req, res, next) {
   try {
     let cloudinaryResult, next_cursor;
-    const cloudinaryCallOptions = { max_results: 500, resource_type: "image" };
+    const cloudinaryCallOptions = {
+      max_results: 500,
+      resource_type: "image",
+    };
     do {
       await cloudinary.v2.api.resources(
         cloudinaryCallOptions,
