@@ -2,25 +2,24 @@
 
 import passport from "passport";
 import OAuth2Strategy from "passport-oauth2";
-import User from './db/models/User';
+import User from "./db/models/User";
 const passportInit = () => {
   // Allowing passport to serialize and deserialize users into sessions
   passport.serializeUser((user, done) => {
-    console.log("serializeUser", { user })
-    return done(null, user.id)
+    console.log("serializeUser", { user });
+    return done(null, user.id);
   });
-  passport.deserializeUser((id, done) => {
-    console.log("deserializeUser", { id })
-    User.findById(id, (err, user) => {
-      if (err) {
-        console.log("no user", err)
-        return done(err);
-      } else {
-        console.log("user", user)
-        return done(null, user)
-      }
-    })
-  })
+  passport.deserializeUser(async (id, done) => {
+    try {
+      console.log("deserializeUser", { id });
+      const user = await User.findById(id).exec();
+      return done(null, user);
+    } catch (err) {
+      console.log("no user", err);
+      return done(err);
+    }
+  });
+
   const client_id =
     process.env.NODE_ENV === "development"
       ? process.env.DEV_CLIENT_ID

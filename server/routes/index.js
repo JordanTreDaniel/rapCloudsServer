@@ -50,15 +50,10 @@ async function search(req, res, next) {
     res.status(status).json({ songs, artists });
     //TO-DO: Is there a way to findManyOrCreate?
     songs.forEach(async (song) => {
-      let mongooseSong = await Song.findOne(
-        { id: song.id },
-        (err, foundInstance) => {
-          return foundInstance;
-        }
-      );
+      let mongooseSong = await Song.findOne({ id: song.id }).exec();
       if (!mongooseSong) {
         mongooseSong = new Song(song);
-        mongooseSong.save();
+        await mongooseSong.save();
       }
       await saveArtistsFromSong(song);
     });
@@ -262,16 +257,12 @@ async function getGoogleFonts(req, res, next) {
 }
 
 async function base64ToFile(fileName, data) {
-  return new Promise((resolve, reject) => {
-    fs.writeFile(fileName, data, "base64", function (err) {
-      if (err) {
-        console.log("Something went wrong with fs.writeFile", err);
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
+  try {
+    await fs.promises.writeFile(fileName, data, "base64");
+  } catch (err) {
+    console.log("Something went wrong with fs.writeFile", err);
+    throw err;
+  }
 }
 
 async function triggerCloudGeneration(req, res, next) {
@@ -479,20 +470,11 @@ async function getMasks(req, res, next) {
   const { params } = req;
   const { userId = "default" } = params;
   try {
-    Mask.find({ userId: { $in: [undefined, userId] } }, function (err, masks) {
-      if (err) {
-        res.status(500).json({
-          message: "Something went wrong fetching resources from DB",
-          err,
-        });
-      }
-      //TO-DO: Modify query to pull public assets as well
-      res.status(200).json({
-        masks: masks.map((mask) => ({
-          ...mask.toObject(),
-          id: mask._id,
-        })),
-      });
+    const masks = await Mask.find({
+      userId: { $in: [undefined, userId] },
+    }).exec();
+    res.status(200).json({
+      masks: masks.map((mask) => ({ ...mask.toObject(), id: mask._id })),
     });
   } catch (error) {
     res.status(500).json(error);
@@ -503,26 +485,15 @@ async function getClouds(req, res, next) {
   const { params } = req;
   const { userId = "default" } = params;
   try {
-    RapCloud.find(
-      { userId: { $in: [userId] }, officialCloud: false },
-      function (err, clouds) {
-        if (err) {
-          res.status(500).json({
-            message: "Something went wrong fetching resources from DB",
-            err,
-          });
-        }
-        //TO-DO: Modify query to pull public assets as well
-        res.status(200).json({
-          clouds: clouds
-            .filter((cloud) => !cloud.info)
-            .map((cloud) => ({
-              ...cloud.toObject(),
-              id: cloud._id,
-            })),
-        });
-      }
-    );
+    const clouds = await RapCloud.find({
+      userId: { $in: [userId] },
+      officialCloud: false,
+    }).exec();
+    res.status(200).json({
+      clouds: clouds
+        .filter((cloud) => !cloud.info)
+        .map((cloud) => ({ ...cloud.toObject(), id: cloud._id })),
+    });
   } catch (error) {
     res.status(500).json(error);
   }
