@@ -8,6 +8,8 @@ import seedDB from "../db/seed";
 import cloudinary from "cloudinary";
 import fs from "fs";
 import a from "genius-lyrics";
+import get from "lodash/get";
+
 const router = express.Router();
 
 async function search(req, res, next) {
@@ -250,14 +252,17 @@ async function getSongLyrics(req, res, next) {
 
 async function getGoogleFonts(req, res, next) {
   try {
-    const {data} = await axios({method: "get", url: `https://www.googleapis.com/webfonts/v1/webfonts?key=${process.env.GOOGLE_API_KEY}`})
-    const {items} = data;
-    res.status(200).json({fonts: items || []})
+    const { data } = await axios({
+      method: "get",
+      url: `https://www.googleapis.com/webfonts/v1/webfonts?key=${process.env.GOOGLE_API_KEY}`,
+    });
+    const { items } = data;
+    res.status(200).json({ fonts: items || [] });
   } catch (error) {
-    console.error("Something went wrong while fetching fonts", error)
+    console.error("Something went wrong while fetching fonts", error);
   }
 }
- 
+
 async function base64ToFile(fileName, data) {
   return new Promise((resolve, reject) => {
     fs.writeFile(fileName, data, "base64", function (err) {
@@ -687,7 +692,55 @@ async function verifyAdmin(req, res, next) {
   }
 }
 
+async function getEmbeddingForStr(str, model = "text-embedding-ada-002") {
+  try {
+    const response = await axios.post(
+      "https://api.openai.com/v1/embeddings",
+      {
+        model,
+        input: str,
+        max_tokens: 64,
+        // n: Math.ceil(terms.length * 0.25), // Get the top 25% of matches
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    const embedding = get(response, "data.data[0].embedding", [0]);
+    return embedding;
+  } catch (error) {
+    console.error("Something went wrong in getEmbeddingForStr", error.message);
+    throw error;
+  }
+}
+
+async function getEmbeddings(req, res, next) {
+  //write a function that will take post request with a str collection in body, and call open ai to return an embedding of that str collection
+  try {
+    const { body } = req;
+    const { strCollection } = body;
+    if (!strCollection) {
+      res.status(400).json({ message: "No strCollection" });
+      return;
+    }
+    const _strCollection = isArr ? strCollection : [`${strCollection}`];
+    const isArr = Array.isArray(_strCollection);
+    const model = "text-embedding-ada-002";
+    const embeddings = await Promise.all(
+      _strCollection.map((str) => getEmbeddingForStr(str, model))
+    );
+    res.status(200).json({ embeddings });
+  } catch (error) {
+    console.error("Something went wrong in getEmbeddings", error.message);
+    res.status(500).json(error);
+  }
+}
+
 router.get("/search", search);
+router.post("/getEmbeddings", getEmbeddings);
 router.get("/getGoogleFonts", getGoogleFonts);
 router.post("/getSongLyrics", getSongLyrics);
 router.post("/setSongLyrics/:songId", setSongLyrics);
