@@ -46,7 +46,7 @@ const appRootUrl =
 const whitelist = [
   "https://www.rapclouds.com",
   "http://localhost:3000",
-  "https://embeddings-explained.surge.sh/",
+  "https://embeddings-explained.surge.sh",
 ];
 app.use(
   cors({
