@@ -726,8 +726,8 @@ async function getEmbeddings(req, res, next) {
       res.status(400).json({ message: "No strCollection" });
       return;
     }
+    const isArr = Array.isArray(strCollection);
     const _strCollection = isArr ? strCollection : [`${strCollection}`];
-    const isArr = Array.isArray(_strCollection);
     const model = "text-embedding-ada-002";
     const embeddings = await Promise.all(
       _strCollection.map((str) => getEmbeddingForStr(str, model))
