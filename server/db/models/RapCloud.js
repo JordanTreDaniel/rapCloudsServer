@@ -43,7 +43,7 @@ const RapCloudSettingsSchema = new mongoose.Schema({
 });
 
 const RapCloudSchema = new mongoose.Schema({
-	artistIds: [String],
+	artistIds: [String], //NOTE: Not using Schema.Types.ObjectId here bc the id's are genius ids
 	description: String,
 	settings: RapCloudSettingsSchema,
 	songIds: [String], //NOTE: Not using Schema.Types.ObjectId here bc the id's are genius ids
