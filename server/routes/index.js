@@ -11,60 +11,87 @@ import a from "genius-lyrics";
 const router = express.Router();
 
 async function search(req, res, next) {
-	const { query } = req;
-	const { q } = query;
-	const { headers } = req;
-	// const { accessToken } = req.session; //TO-DO: Get access token to be dependably stored in session, so we don't save on User.
+	const { query, headers } = req;
+	const { q, type = "songs" } = query;
 	const { authorization: accessToken } = headers;
-	if (!accessToken) {
-		res.status(401).json({
-			status: 401,
-			statusText: "Missing access token. Please sign in first",
-		});
-		// made a mistake with the line above and this helped me out:
-		//https://stackoverflow.com/questions/7042340/error-cant-set-headers-after-they-are-sent-to-the-client
-	}
-	try {
-		const { data } = await axios({
-			method: "get",
-			url: `https://api.genius.com/search`,
-			headers: {
-				accept: "application/json",
-				// host: "api.genius.com",
-				authorization: `Bearer ${accessToken}`,
-			},
-			params: {
-				q,
-			},
-		});
-		const { meta, response } = data;
-		const { status } = meta;
-		const { hits } = response;
-		const songs = hits.map((hit) => hit.result);
-		const artists = songs.reduce((artists, song) => {
-			const { primary_artist, featured_artists = [] } = song;
-			artists[primary_artist.id] = primary_artist;
-			featured_artists.forEach((artist) => (artists[artist.id] = artist));
-			return artists;
-		}, {});
-		res.status(status).json({ songs, artists });
-		//TO-DO: Is there a way to findManyOrCreate?
-		songs.forEach(async (song) => {
-			let mongooseSong = await Song.findOne(
-				{ id: song.id },
-				(err, foundInstance) => {
-					return foundInstance;
-				}
-			);
-			if (!mongooseSong) {
-				mongooseSong = new Song(song);
-				mongooseSong.save();
+
+	if (accessToken) {
+		// User info available, call the external API
+		try {
+			const { data } = await axios({
+				method: "get",
+				url: `https://api.genius.com/search`,
+				headers: {
+					accept: "application/json",
+					authorization: `Bearer ${accessToken}`,
+				},
+				params: { q },
+			});
+			const { meta, response } = data;
+			const { status } = meta;
+			const { hits } = response;
+			if (type.match("song")) {
+				const songs = hits.map((hit) => hit.result);
+				res.status(status).json({ songs });
+			} else {
+				const artists = songs.reduce((artists, song) => {
+					const { primary_artist, featured_artists = [] } = song;
+					artists[primary_artist.id] = primary_artist;
+					featured_artists.forEach((artist) => (artists[artist.id] = artist));
+					return artists;
+				}, {});
+				res.status(status).json({ artists });
 			}
-			await saveArtistsFromSong(song);
-		});
-	} catch (err) {
-		const { status, statusText } = err.response;
-		res.status(401).json({ status, statusText });
+			//TO-DO: Is there a way to findManyOrCreate?
+			songs.forEach(async (song) => {
+				let mongooseSong = await Song.findOne(
+					{ id: song.id },
+					(err, foundInstance) => {
+						return foundInstance;
+					}
+				);
+				if (!mongooseSong) {
+					mongooseSong = new Song(song);
+					mongooseSong.save();
+				}
+				await saveArtistsFromSong(song);
+			});
+		} catch (err) {
+			const { status, statusText } = err.response;
+			res.status(status).json({ status, statusText });
+		}
+	} else {
+		// No user info, search MongoDB
+		try {
+			//rewrite the above to do either songs or artists, (but not both) depending on the type
+			if (type.match("song")) {
+				const songResults = await Song.find({
+					full_title: { $regex: q, $options: "i" },
+				}).limit(24);
+				const songs = songResults; // Assuming songs are already in the expected format
+				const trimmedSongs = songs.map((song) => {
+					const { id, full_title } = song;
+					return { id, full_title };
+				});
+				console.log(`Found ${trimmedSongs.length} songs`);
+				res.status(200).json({ songs: trimmedSongs });
+			} else {
+				const artistResults = await Artist.find({
+					name: { $regex: q, $options: "i" },
+				}).limit(24);
+				const artists = artistResults; // Assuming artists are already in the expected format
+				const trimmedArtists = artists.map((artist) => {
+					const { id, name } = artist;
+					return { id, name };
+				});
+				console.log(`Found ${trimmedArtists.length} artists`);
+				res.status(200).json({ artists: trimmedArtists });
+			}
+		} catch (err) {
+			res
+				.status(500)
+				.json({ message: "Error searching the database", error: err.message });
+		}
 	}
 }
 
@@ -501,15 +528,32 @@ async function getClouds(req, res, next) {
 	const page = parseInt(query.page) || 1; // Default to page 1 if not provided
 	const limit = parseInt(query.limit) || 12; // Default to 10 records per page if not provided
 	const skip = (page - 1) * limit;
+	// Constructing a dynamic query object based on incoming filters
+	let filters = userId
+		? { userId: { $in: [userId] }, officialCloud: false }
+		: {};
+	if (query.artistIds) {
+		console.log("query.artistIds", query.artistIds.split(","));
+		filters["artistIds"] = { $in: query.artistIds.split(",") };
+	}
+	if (query.songIds) {
+		console.log("query.songIds", query.songIds.split(","));
+		filters["songIds"] = { $in: query.songIds.split(",") };
+	}
+	if (query.maskIds) {
+		filters["maskIds"] = { $in: query.maskIds.split(",") };
+	}
+	if (query.cloudId) {
+		filters["_id"] = query.cloudId;
+	}
+	if (query.hasOwnProperty("officialClouds")) {
+		filters["officialCloud"] = query.officialClouds === "true";
+	}
 
 	try {
-		const totalCount = await RapCloud.countDocuments(
-			userId ? { userId: { $in: [userId] }, officialCloud: false } : {}
-		);
+		const totalCount = await RapCloud.countDocuments(filters);
 
-		RapCloud.find(
-			userId ? { userId: { $in: [userId] }, officialCloud: false } : {}
-		)
+		RapCloud.find(filters)
 			.populate("maskId") // Populate mask data
 			.skip(skip)
 			.limit(limit)
