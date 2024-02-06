@@ -503,20 +503,25 @@ const testPython = async (req, res, next) => {
 
 async function getMasks(req, res, next) {
 	const { params } = req;
-	const { userId = "default" } = params;
+	const { userId = null } = params;
 	try {
-		Mask.find({ userId: { $in: [undefined, userId] } }, function (err, masks) {
-			if (err) {
-				res.status(500).json({
-					message: "Something went wrong fetching resources from DB",
-					err,
+		if (userId) {
+		}
+		Mask.find(
+			userId ? { userId: { $in: [undefined, userId] } } : {},
+			function (err, masks) {
+				if (err) {
+					res.status(500).json({
+						message: "Something went wrong fetching resources from DB",
+						err,
+					});
+				}
+				//TO-DO: Modify query to pull public assets as well
+				res.status(200).json({
+					masks: masks.map((mask) => ({ ...mask.toObject(), id: mask._id })),
 				});
 			}
-			//TO-DO: Modify query to pull public assets as well
-			res.status(200).json({
-				masks: masks.map((mask) => ({ ...mask.toObject(), id: mask._id })),
-			});
-		});
+		);
 	} catch (error) {
 		res.status(500).json(error);
 	}
@@ -541,7 +546,7 @@ async function getClouds(req, res, next) {
 		filters["songIds"] = { $in: query.songIds.split(",") };
 	}
 	if (query.maskIds) {
-		filters["maskIds"] = { $in: query.maskIds.split(",") };
+		filters["settings.maskId"] = { $in: query.maskIds.split(",") };
 	}
 	if (query.cloudId) {
 		filters["_id"] = query.cloudId;
@@ -554,7 +559,6 @@ async function getClouds(req, res, next) {
 		const totalCount = await RapCloud.countDocuments(filters);
 
 		RapCloud.find(filters)
-			.populate("maskId") // Populate mask data
 			.skip(skip)
 			.limit(limit)
 			.exec(async function (err, clouds) {
